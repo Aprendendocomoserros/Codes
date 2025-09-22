@@ -1,6 +1,7 @@
---[[ 
-LastOneHub Premium - GUI estilo Rayfield (completo)
-Remove qualquer GUI anterior do CoreGui antes de criar a nova
+--[[
+LastOneHub Premium - GUI Moderna e Animada (Completo)
+Sistema inspirado em Rayfield, com todos os elementos:
+Botões, Sliders, Toggles, Dropdowns, Inputs, Keybinds, Notificações
 ]]--
 
 local UserInputService = game:GetService("UserInputService")
@@ -12,22 +13,36 @@ LastOneHub.__index = LastOneHub
 
 local function create(class, props)
     local inst = Instance.new(class)
-    if props then
-        for k, v in pairs(props) do
-            pcall(function() inst[k] = v end)
-        end
+    for k, v in pairs(props or {}) do
+        pcall(function() inst[k] = v end)
     end
     return inst
 end
 
+-- Função para criar sombra bonita
+local function addShadow(parent)
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.Parent = parent
+    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    shadow.Size = UDim2.new(1, 40, 1, 40)
+    shadow.Image = "rbxassetid://1316045217"
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.7
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+    shadow.ZIndex = parent.ZIndex - 1
+end
+
 ----------------------------
--- Cria GUI Principal
+-- Criação da GUI Principal
 ----------------------------
 function LastOneHub.new(title)
-    -- Remove GUI anterior se existir
+    -- Remove GUIs anteriores
     local oldGui = game:GetService("CoreGui"):FindFirstChild("LastoneHub")
     if oldGui then
-        pcall(function() oldGui:Destroy() end)
+        oldGui:Destroy()
     end
 
     local self = setmetatable({}, LastOneHub)
@@ -37,89 +52,98 @@ function LastOneHub.new(title)
         Name = "LastoneHub"
     })
 
+    -- Janela Principal
     self.Main = create("Frame", {
         Parent = self.Gui,
-        Size = UDim2.new(0, 500, 0, 350),
-        Position = UDim2.new(0.5, -250, 0.5, -175),
-        BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+        Size = UDim2.new(0, 550, 0, 400),
+        Position = UDim2.new(0.5, -275, 0.5, -200),
+        BackgroundColor3 = Color3.fromRGB(30, 30, 30),
         ClipsDescendants = true
     })
+    addShadow(self.Main)
+    create("UICorner", { Parent = self.Main, CornerRadius = UDim.new(0, 12) })
 
+    -- Topo
     local top = create("Frame", {
         Parent = self.Main,
-        Size = UDim2.new(1, 0, 0, 30),
-        BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     })
+    create("UICorner", { Parent = top, CornerRadius = UDim.new(0, 12) })
 
+    -- Título
     create("TextLabel", {
         Parent = top,
-        Text = title or "LastOneHub",
-        Size = UDim2.new(1, -40, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
+        Text = title or "LastOneHub Premium",
+        Size = UDim2.new(1, -60, 1, 0),
+        Position = UDim2.new(0, 15, 0, 0),
         TextColor3 = Color3.new(1, 1, 1),
         BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Font = Enum.Font.GothamBold,
+        TextSize = 18
     })
 
+    -- Botão de fechar
     local closeBtn = create("TextButton", {
         Parent = top,
-        Text = "X",
-        Size = UDim2.new(0, 30, 1, 0),
-        Position = UDim2.new(1, -30, 0, 0),
-        BackgroundColor3 = Color3.fromRGB(170, 0, 0),
-        TextColor3 = Color3.new(1, 1, 1)
+        Text = "✖",
+        Size = UDim2.new(0, 40, 1, 0),
+        Position = UDim2.new(1, -40, 0, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.fromRGB(255, 70, 70),
+        Font = Enum.Font.GothamBold,
+        TextSize = 20
     })
-
     closeBtn.MouseButton1Click:Connect(function()
-        pcall(function() self.Gui.Enabled = false end)
-        if self.OnClose then pcall(self.OnClose) end
+        TweenService:Create(self.Main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}):Play()
+        wait(0.4)
+        self.Gui:Destroy()
     end)
 
-    -- Drag da janela
-    local dragging, dragInput, dragStart, startPos
+    -- Sistema de arrastar
+    local dragging, dragStart, startPos
     top.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = self.Main.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
         end
     end)
-
-    top.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
+    top.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
         end
     end)
-
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging and dragStart and startPos then
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            local sx, ox = startPos.X.Scale, startPos.X.Offset
-            local sy, oy = startPos.Y.Scale, startPos.Y.Offset
-            self.Main.Position = UDim2.new(sx, ox + delta.X, sy, oy + delta.Y)
+            self.Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 
-    -- Sidebar e container de abas
+    -- Sidebar (Abas)
     self.Sidebar = create("Frame", {
         Parent = self.Main,
-        Size = UDim2.new(0, 120, 1, -30),
-        Position = UDim2.new(0, 0, 0, 30),
+        Size = UDim2.new(0, 140, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
         BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     })
-    create("UIListLayout", { Parent = self.Sidebar, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5) })
+    create("UICorner", { Parent = self.Sidebar, CornerRadius = UDim.new(0, 12) })
+    create("UIListLayout", {
+        Parent = self.Sidebar,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6)
+    })
 
+    -- Conteúdo da aba
     self.TabHolder = create("Frame", {
         Parent = self.Main,
-        Size = UDim2.new(1, -120, 1, -30),
-        Position = UDim2.new(0, 120, 0, 30),
-        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Size = UDim2.new(1, -140, 1, -40),
+        Position = UDim2.new(0, 140, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     })
+    create("UICorner", { Parent = self.TabHolder, CornerRadius = UDim.new(0, 12) })
 
     self.Tabs = {}
     self.Keybinds = {}
@@ -130,42 +154,54 @@ function LastOneHub.new(title)
 end
 
 ----------------------------
--- Tabs e Scrolling
+-- Criação de Abas
 ----------------------------
 function LastOneHub:CreateTab(name)
-    local btn = create("TextButton", {
+    local tabBtn = create("TextButton", {
         Parent = self.Sidebar,
         Text = name,
-        Size = UDim2.new(1, -10, 0, 30),
+        Size = UDim2.new(1, -12, 0, 36),
         BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-        TextColor3 = Color3.new(1, 1, 1)
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = Enum.Font.Gotham,
+        TextSize = 14
     })
+    create("UICorner", { Parent = tabBtn, CornerRadius = UDim.new(0, 8) })
 
-    local cont = create("ScrollingFrame", {
+    local container = create("ScrollingFrame", {
         Parent = self.TabHolder,
-        Size = UDim2.new(1, 0, 1, 0),
+        Size = UDim2.new(1, -20, 1, -20),
+        Position = UDim2.new(0, 10, 0, 10),
         Visible = false,
         BackgroundTransparency = 1,
         ScrollBarThickness = 6,
         CanvasSize = UDim2.new(0, 0, 0, 0)
     })
+    create("UIListLayout", {
+        Parent = container,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8)
+    })
 
-    create("UIListLayout", { Parent = cont, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5) })
-
-    local tab = { Name = name, Button = btn, Container = cont }
+    local tab = { Name = name, Button = tabBtn, Container = container }
     self.Tabs[name] = tab
 
-    btn.MouseButton1Click:Connect(function()
+    -- Evento de clique
+    tabBtn.MouseButton1Click:Connect(function()
         for _, t in pairs(self.Tabs) do
-            if t.Container then t.Container.Visible = false end
+            t.Container.Visible = false
+            TweenService:Create(t.Button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(45,45,45)}):Play()
         end
-        cont.Visible = true
+        container.Visible = true
+        TweenService:Create(tabBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(70,70,70)}):Play()
         self.CurrentTab = tab
     end)
 
+    -- Primeira aba visível
     if not self.CurrentTab then
-        cont.Visible = true
+        container.Visible = true
         self.CurrentTab = tab
+        tabBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     end
 
     return tab
@@ -178,313 +214,518 @@ function LastOneHub:UpdateScrolling(tabName)
     if not layout then return end
     local total = 0
     for _, child in ipairs(tab.Container:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-            local ok, y = pcall(function() return child.Size.Y.Offset end)
-            local pad = (layout.Padding and layout.Padding.Offset) or 0
-            total = total + (tonumber(y) or 0) + (tonumber(pad) or 0)
+        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextBox") then
+            total = total + child.Size.Y.Offset + layout.Padding.Offset
         end
     end
     tab.Container.CanvasSize = UDim2.new(0, 0, 0, total)
 end
-
 ----------------------------
--- Elementos
+-- ELEMENTOS INTERATIVOS
 ----------------------------
--- Label
-function LastOneHub:CreateLabel(tab, text)
-    if not self.Tabs[tab] then return end
-    local lbl = create("TextLabel", {
-        Parent = self.Tabs[tab].Container,
-        Text = tostring(text or ""),
-        Size = UDim2.new(1, -10, 0, 25),
-        BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-        TextColor3 = Color3.new(1, 1, 1)
-    })
-    self:UpdateScrolling(tab)
-    return { Set = function(_, new) lbl.Text = tostring(new); self:UpdateScrolling(tab) end }
-end
 
--- Button
+-- Botão com animação
 function LastOneHub:CreateButton(tab, text, callback)
     if not self.Tabs[tab] then return end
     local btn = create("TextButton", {
         Parent = self.Tabs[tab].Container,
         Text = tostring(text or ""),
-        Size = UDim2.new(1, -10, 0, 30),
-        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
-        TextColor3 = Color3.new(1, 1, 1)
+        Size = UDim2.new(1, -10, 0, 36),
+        BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
     })
-    create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 6) })
+    create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 8) })
+
     btn.MouseEnter:Connect(function()
-        pcall(function() TweenService:Create(btn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(90, 90, 90) }):Play() end)
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 80, 80)}):Play()
     end)
     btn.MouseLeave:Connect(function()
-        pcall(function() TweenService:Create(btn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(70, 70, 70) }):Play() end)
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
     end)
+
     btn.MouseButton1Click:Connect(function()
         if callback then pcall(callback) end
     end)
+
     self:UpdateScrolling(tab)
-    return { Set = function(_, new, cb) btn.Text = tostring(new); if cb then callback = cb end end }
+    return btn
 end
 
--- Toggle
+-- Toggle estilo interruptor animado
 function LastOneHub:CreateToggle(tab, text, default, callback)
     if not self.Tabs[tab] then return end
     default = (default == true)
-    local frame = create("Frame", { Parent = self.Tabs[tab].Container, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Color3.fromRGB(60, 60, 60) })
-    local lbl = create("TextLabel", { Parent = frame, Text = tostring(text or ""), Size = UDim2.new(1, -50, 1, 0), BackgroundTransparency = 1, TextColor3 = Color3.new(1,1,1), TextXAlignment = Enum.TextXAlignment.Left })
-    local btn = create("TextButton", { Parent = frame, Text = default and "ON" or "OFF", Size = UDim2.new(0,40,1,0), Position = UDim2.new(1,-40,0,0), BackgroundColor3 = default and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0), TextColor3 = Color3.new(1,1,1) })
-    create("UICorner", { Parent = btn, CornerRadius = UDim.new(0,4) })
+
+    local frame = create("Frame", {
+        Parent = self.Tabs[tab].Container,
+        Size = UDim2.new(1, -10, 0, 36),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    })
+    create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 8) })
+
+    local lbl = create("TextLabel", {
+        Parent = frame,
+        Text = tostring(text or ""),
+        Size = UDim2.new(1, -60, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    -- Interruptor
+    local switch = create("Frame", {
+        Parent = frame,
+        Size = UDim2.new(0, 50, 0, 20),
+        Position = UDim2.new(1, -60, 0.5, -10),
+        BackgroundColor3 = Color3.fromRGB(80, 80, 80),
+        ClipsDescendants = true
+    })
+    create("UICorner", { Parent = switch, CornerRadius = UDim.new(1, 0) })
+
+    local knob = create("Frame", {
+        Parent = switch,
+        Size = UDim2.new(0, 22, 0, 22),
+        Position = default and UDim2.new(1, -22, 0.5, -11) or UDim2.new(0, 0, 0.5, -11),
+        BackgroundColor3 = default and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    })
+    create("UICorner", { Parent = knob, CornerRadius = UDim.new(1, 0) })
+
     local state = default
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.Text = state and "ON" or "OFF"
-        btn.BackgroundColor3 = state and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
-        if callback then pcall(callback,state) end
+
+    local function updateToggle(animated)
+        if animated then
+            TweenService:Create(knob, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Position = state and UDim2.new(1, -22, 0.5, -11) or UDim2.new(0, 0, 0.5, -11),
+                BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+            }):Play()
+        else
+            knob.Position = state and UDim2.new(1, -22, 0.5, -11) or UDim2.new(0, 0, 0.5, -11)
+            knob.BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        end
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            state = not state
+            updateToggle(true)
+            if callback then pcall(callback, state) end
+        end
     end)
+
+    updateToggle(false)
     self:UpdateScrolling(tab)
+
     return {
         Set = function(_, val)
             state = (val == true)
-            btn.Text = state and "ON" or "OFF"
-            btn.BackgroundColor3 = state and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
-            if callback then pcall(callback,state) end
+            updateToggle(true)
+            if callback then pcall(callback, state) end
         end,
         Get = function() return state end
     }
 end
 
--- Slider
-function LastOneHub:CreateSlider(tab,text,min,max,default,callback)
+-- Slider moderno animado
+function LastOneHub:CreateSlider(tab, text, min, max, default, callback)
     if not self.Tabs[tab] then return end
     min = tonumber(min) or 0
     max = tonumber(max) or 100
-    if max==min then max=min+1 end
-    default = tonumber(default) or min
-    local function safeClamp(v,a,b)
-        v=tonumber(v) or a
-        if v<a then return a end
-        if v>b then return b end
-        return v
-    end
+    default = math.clamp(tonumber(default) or min, min, max)
 
-    local frame=create("Frame",{ Parent=self.Tabs[tab].Container, Size=UDim2.new(1,-10,0,50), BackgroundColor3=Color3.fromRGB(60,60,60) })
-    local lbl=create("TextLabel",{ Parent=frame, Size=UDim2.new(1,0,0,20), BackgroundTransparency=1, TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left })
-    local bar=create("Frame",{ Parent=frame, Size=UDim2.new(1,-20,0,8), Position=UDim2.new(0,10,0,30), BackgroundColor3=Color3.fromRGB(90,90,90) })
-    local knob=create("Frame",{ Parent=bar, Size=UDim2.new(0,15,0,15), BackgroundColor3=Color3.fromRGB(200,50,50) })
-    Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
-    local dragging=false
-    local value=safeClamp(default,min,max)
-    local function set(val)
-        val=safeClamp(val,min,max)
-        value=val
-        local pct=(val-min)/(max-min)
-        if pct~=pct then pct=0 end
-        knob.Position=UDim2.new(pct,-7.5,-0.5,0)
-        lbl.Text=tostring(text or "")..": "..tostring(val)
-        if callback then pcall(callback,val) end
-    end
-    knob.InputBegan:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType==Enum.UserInputType.MouseMovement and bar.AbsoluteSize.X>0 then
-            local rel=(input.Position.X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X
-            rel=math.clamp(rel,0,1)
-            local computed=math.floor(min+rel*(max-min))
-            set(computed)
-        end
-    end)
-    set(value)
-    self:UpdateScrolling(tab)
-    return { Set=set, Get=function() return value end }
-end
-
--- Input (TextBox)
-function LastOneHub:CreateInput(tab, placeholder, callback)
-    if not self.Tabs[tab] then return end
-    local box=create("TextBox",{
-        Parent=self.Tabs[tab].Container,
-        Text="",
-        PlaceholderText=tostring(placeholder or ""),
-        Size=UDim2.new(1,-10,0,30),
-        BackgroundColor3=Color3.fromRGB(60,60,60),
-        TextColor3=Color3.new(1,1,1)
+    local frame = create("Frame", {
+        Parent = self.Tabs[tab].Container,
+        Size = UDim2.new(1, -10, 0, 60),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     })
-    box.ClearTextOnFocus=false
-    box.FocusLost:Connect(function(enter)
-        if enter and callback then pcall(callback,box.Text) end
+    create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 8) })
+
+    local lbl = create("TextLabel", {
+        Parent = frame,
+        Text = tostring(text) .. ": " .. default,
+        Size = UDim2.new(1, -20, 0, 20),
+        Position = UDim2.new(0, 10, 0, 5),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local bar = create("Frame", {
+        Parent = frame,
+        Size = UDim2.new(1, -20, 0, 8),
+        Position = UDim2.new(0, 10, 0, 35),
+        BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    })
+    create("UICorner", { Parent = bar, CornerRadius = UDim.new(1, 0) })
+
+    local fill = create("Frame", {
+        Parent = bar,
+        Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    })
+    create("UICorner", { Parent = fill, CornerRadius = UDim.new(1, 0) })
+
+    local knob = create("Frame", {
+        Parent = bar,
+        Size = UDim2.new(0, 18, 0, 18),
+        Position = UDim2.new((default - min) / (max - min), -9, 0.5, -9),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    })
+    create("UICorner", { Parent = knob, CornerRadius = UDim.new(1, 0) })
+
+    local dragging = false
+    local value = default
+
+    local function updateSlider(val)
+        val = math.clamp(val, min, max)
+        value = val
+        local pct = (val - min) / (max - min)
+        TweenService:Create(fill, TweenInfo.new(0.15), {Size = UDim2.new(pct, 0, 1, 0)}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {Position = UDim2.new(pct, -9, 0.5, -9)}):Play()
+        lbl.Text = tostring(text) .. ": " .. tostring(math.floor(val))
+        if callback then pcall(callback, val) end
+    end
+
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
     end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local rel = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+            local newVal = math.floor(min + rel * (max - min))
+            updateSlider(newVal)
+        end
+    end)
+
+    updateSlider(default)
     self:UpdateScrolling(tab)
+
     return {
-        Set=function(_,txt,isText)
-            if isText==true then
-                box.Text=tostring(txt or "")
-            else
-                box.PlaceholderText=tostring(txt or "")
-            end
-            if callback and isText==true then pcall(callback,box.Text) end
+        Set = function(_, val)
+            updateSlider(val)
         end,
-        Get=function() return box.Text end
+        Get = function()
+            return value
+        end
     }
 end
-
--- Dropdown
-function LastOneHub:CreateDropdown(tab,text,options,callback)
+----------------------------
+-- DROPDOWN ANIMADO
+----------------------------
+function LastOneHub:CreateDropdown(tab, text, list, default, callback)
     if not self.Tabs[tab] then return end
-    options=options or {}
-    local frame=create("Frame",{ Parent=self.Tabs[tab].Container, Size=UDim2.new(1,-10,0,30), BackgroundColor3=Color3.fromRGB(60,60,60) })
-    local lbl=create("TextLabel",{ Parent=frame, Text=tostring(text or "")..": Nenhum", Size=UDim2.new(0.6,0,1,0), BackgroundTransparency=1, TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left })
-    local btn=create("TextButton",{ Parent=frame, Text="▼", Size=UDim2.new(0.4,0,1,0), Position=UDim2.new(0.6,0,0,0), BackgroundColor3=Color3.fromRGB(90,90,90), TextColor3=Color3.new(1,1,1) })
-    local list=create("Frame",{ Parent=self.Gui, Visible=false, BackgroundColor3=Color3.fromRGB(70,70,70), Size=UDim2.new(0,150,0,0), ZIndex=50 })
-    create("UIListLayout",{ Parent=list, SortOrder=Enum.SortOrder.LayoutOrder })
-    local selected=nil
-    local isOpen=false
+    list = list or {}
+
+    local frame = create("Frame", {
+        Parent = self.Tabs[tab].Container,
+        Size = UDim2.new(1, -10, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+        ClipsDescendants = true
+    })
+    create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 8) })
+
+    local title = create("TextLabel", {
+        Parent = frame,
+        Text = tostring(text or "Dropdown"),
+        Size = UDim2.new(1, -30, 0, 40),
+        Position = UDim2.new(0, 10, 0, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    })
+
+    local arrow = create("TextLabel", {
+        Parent = frame,
+        Text = "▼",
+        Size = UDim2.new(0, 30, 0, 40),
+        Position = UDim2.new(1, -30, 0, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        Font = Enum.Font.GothamBold,
+        TextSize = 18
+    })
+
+    local optionsFrame = create("Frame", {
+        Parent = frame,
+        Size = UDim2.new(1, -20, 0, #list * 30),
+        Position = UDim2.new(0, 10, 0, 40),
+        BackgroundTransparency = 1
+    })
+    local layout = create("UIListLayout", {
+        Parent = optionsFrame,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5)
+    })
+
+    local selected = default or list[1]
+    local open = false
+    local optionButtons = {}
+
+    -- Função para abrir/fechar
     local function toggleDropdown()
-        if isOpen then list.Visible=false isOpen=false return end
-        list:ClearAllChildren()
-        create("UIListLayout",{ Parent=list })
-        for _,opt in ipairs(options) do
-            local o=create("TextButton",{ Parent=list, Text=tostring(opt), Size=UDim2.new(1,0,0,25), BackgroundColor3=Color3.fromRGB(100,100,100), TextColor3=Color3.new(1,1,1), ZIndex=50 })
-            create("UICorner",{ Parent=o, CornerRadius=UDim.new(0,4) })
-            o.MouseButton1Click:Connect(function()
-                selected=opt
-                lbl.Text=tostring(text or "")..": "..tostring(opt)
-                list.Visible=false
-                isOpen=false
-                if callback then pcall(callback,opt) end
-            end)
-        end
-        list.Size=UDim2.new(0,math.max(100,frame.AbsoluteSize.X),0,#options*25)
-        list.Position=UDim2.new(0,frame.AbsolutePosition.X,0,frame.AbsolutePosition.Y+frame.AbsoluteSize.Y)
-        list.Visible=true
-        isOpen=true
+        open = not open
+        TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = open and UDim2.new(1, -10, 0, 40 + (#list * 35)) or UDim2.new(1, -10, 0, 40)
+        }):Play()
+        TweenService:Create(arrow, TweenInfo.new(0.3), {
+            Rotation = open and 180 or 0
+        }):Play()
     end
-    btn.MouseButton1Click:Connect(toggleDropdown)
-    RunService.RenderStepped:Connect(function()
-        if list.Visible and frame and frame.Parent then
-            pcall(function() list.Position=UDim2.new(0,frame.AbsolutePosition.X,0,frame.AbsolutePosition.Y+frame.AbsoluteSize.Y) end)
+
+    -- Criar botões
+    for _, option in ipairs(list) do
+        local btn = create("TextButton", {
+            Parent = optionsFrame,
+            Text = option,
+            Size = UDim2.new(1, 0, 0, 30),
+            BackgroundColor3 = Color3.fromRGB(70, 70, 70),
+            TextColor3 = Color3.new(1, 1, 1),
+            Font = Enum.Font.Gotham,
+            TextSize = 14
+        })
+        create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 6) })
+
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90, 90, 90)}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+        end)
+
+        btn.MouseButton1Click:Connect(function()
+            selected = option
+            title.Text = text .. ": " .. option
+            toggleDropdown()
+            if callback then pcall(callback, option) end
+        end)
+
+        table.insert(optionButtons, btn)
+    end
+
+    -- Evento de clique para abrir/fechar
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and not open then
+            toggleDropdown()
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 and open then
+            toggleDropdown()
         end
     end)
+
     self:UpdateScrolling(tab)
     return {
-        Set=function(_,val) selected=val lbl.Text=tostring(text or "")..": "..tostring(val) if callback then pcall(callback,val) end end,
-        Get=function() return selected end
+        Get = function() return selected end,
+        Set = function(_, val)
+            if table.find(list, val) then
+                selected = val
+                title.Text = text .. ": " .. val
+            end
+        end
     }
 end
 
--- Keybind
-function LastOneHub:CreateKeybind(tab,text,default,callback)
+----------------------------
+-- INPUT BOX (Campo de Texto)
+----------------------------
+function LastOneHub:CreateInput(tab, text, placeholder, callback)
     if not self.Tabs[tab] then return end
-    local frame=create("Frame",{ Parent=self.Tabs[tab].Container, Size=UDim2.new(1,-10,0,30), BackgroundColor3=Color3.fromRGB(60,60,60) })
-    local lbl=create("TextLabel",{ Parent=frame, Text=tostring(text or "")..": "..tostring(default), Size=UDim2.new(0.6,0,1,0), BackgroundTransparency=1, TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left })
-    local btn=create("TextButton",{ Parent=frame, Text="Mudar", Size=UDim2.new(0.4,0,1,0), Position=UDim2.new(0.6,0,0,0), BackgroundColor3=Color3.fromRGB(90,90,90), TextColor3=Color3.new(1,1,1) })
-    local bind=default
-    local changing=false
-    if bind~=nil then self.Keybinds[bind]=callback end
-    btn.MouseButton1Click:Connect(function() btn.Text="Pressione..."; changing=true end)
-    UserInputService.InputBegan:Connect(function(input,gp)
-        if gp then return end
-        if input.UserInputType==Enum.UserInputType.Keyboard then
-            if changing then
-                bind=input.KeyCode
-                lbl.Text=tostring(text or "")..": "..tostring(bind.Name or tostring(bind))
-                self.Keybinds={}
-                self.Keybinds[bind]=callback
-                btn.Text="Mudar"
-                changing=false
-            else
-                local fn=self.Keybinds[input.KeyCode]
-                if fn then pcall(fn) end
-            end
+
+    local frame = create("Frame", {
+        Parent = self.Tabs[tab].Container,
+        Size = UDim2.new(1, -10, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    })
+    create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 8) })
+
+    local label = create("TextLabel", {
+        Parent = frame,
+        Text = tostring(text or "Input"),
+        Size = UDim2.new(0, 80, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local box = create("TextBox", {
+        Parent = frame,
+        PlaceholderText = placeholder or "",
+        Size = UDim2.new(1, -100, 1, -10),
+        Position = UDim2.new(0, 90, 0, 5),
+        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        ClipsDescendants = true
+    })
+    create("UICorner", { Parent = box, CornerRadius = UDim.new(0, 6) })
+
+    box.FocusLost:Connect(function(enterPressed)
+        if enterPressed and callback then
+            pcall(callback, box.Text)
         end
     end)
+
+    self:UpdateScrolling(tab)
+    return box
+end
+
+----------------------------
+-- KEYBIND CONFIGURÁVEL
+----------------------------
+function LastOneHub:CreateKeybind(tab, text, defaultKey, callback)
+    if not self.Tabs[tab] then return end
+    defaultKey = defaultKey or Enum.KeyCode.E
+
+    local frame = create("Frame", {
+        Parent = self.Tabs[tab].Container,
+        Size = UDim2.new(1, -10, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    })
+    create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 8) })
+
+    local lbl = create("TextLabel", {
+        Parent = frame,
+        Text = tostring(text or "Keybind"),
+        Size = UDim2.new(0.7, 0, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local btn = create("TextButton", {
+        Parent = frame,
+        Text = defaultKey.Name,
+        Size = UDim2.new(0.25, 0, 0.8, 0),
+        Position = UDim2.new(0.7, 5, 0.1, 0),
+        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
+    })
+    create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 6) })
+
+    local binding = false
+    local currentKey = defaultKey
+
+    btn.MouseButton1Click:Connect(function()
+        binding = true
+        btn.Text = "..."
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if binding then
+            currentKey = input.KeyCode
+            btn.Text = currentKey.Name
+            binding = false
+            if callback then pcall(callback, currentKey) end
+        elseif input.KeyCode == currentKey then
+            if callback then pcall(callback, currentKey, true) end
+        end
+    end)
+
     self:UpdateScrolling(tab)
     return {
-        Set=function(_,new)
-            bind=new
-            lbl.Text=tostring(text or "")..": "..tostring(new.Name or tostring(new))
-            self.Keybinds={}
-            self.Keybinds[bind]=callback
+        Set = function(_, key)
+            currentKey = key
+            btn.Text = key.Name
         end,
-        Get=function() return bind end
+        Get = function() return currentKey end
     }
 end
 
--- Notificações
-function LastOneHub:Notify(title,text,dur)
-    dur=tonumber(dur) or 3
-    local function createNotificationFrame(index)
-        local yOffset=-70-((index-1)*70)
-        local frame=create("Frame",{ Parent=self.Gui, Size=UDim2.new(0,300,0,70), Position=UDim2.new(1,320,1,yOffset), BackgroundColor3=Color3.fromRGB(50,50,50), ClipsDescendants=true })
-        create("UICorner",{ Parent=frame, CornerRadius=UDim.new(0,8) })
-        local titleLabel=create("TextLabel",{ Parent=frame, Text=tostring(title or ""), Size=UDim2.new(1,-20,0,24), Position=UDim2.new(0,10,0,6), BackgroundTransparency=1, TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.SourceSansBold })
-        local bodyLabel=create("TextLabel",{ Parent=frame, Text=tostring(text or ""), Size=UDim2.new(1,-20,0,36), Position=UDim2.new(0,10,0,28), BackgroundTransparency=1, TextColor3=Color3.new(1,1,1), TextWrapped=true, TextXAlignment=Enum.TextXAlignment.Left })
-        titleLabel.TextTransparency=1
-        bodyLabel.TextTransparency=1
-        frame.BackgroundTransparency=1
-        return { Frame=frame, Title=titleLabel, Body=bodyLabel }
+----------------------------
+-- SISTEMA DE NOTIFICAÇÕES
+----------------------------
+function LastOneHub:Notify(title, text, duration)
+    duration = duration or 3
+
+    -- Container para notificações
+    local notifContainer = self.Gui:FindFirstChild("NotifContainer")
+    if not notifContainer then
+        notifContainer = create("Frame", {
+            Parent = self.Gui,
+            Name = "NotifContainer",
+            Size = UDim2.new(0, 300, 1, -20),
+            Position = UDim2.new(1, -310, 0, 10),
+            BackgroundTransparency = 1
+        })
+        create("UIListLayout", {
+            Parent = notifContainer,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 10),
+            VerticalAlignment = Enum.VerticalAlignment.Top
+        })
     end
 
-    if #self.Notifs>=self.MaxNotifs then
-        local excess=(#self.Notifs+1)-self.MaxNotifs
-        for i=1,excess do
-            local old=table.remove(self.Notifs,1)
-            if old and old.Frame then
-                pcall(function()
-                    TweenService:Create(old.Title,TweenInfo.new(0.25),{TextTransparency=1}):Play()
-                    TweenService:Create(old.Body,TweenInfo.new(0.25),{TextTransparency=1}):Play()
-                    TweenService:Create(old.Frame,TweenInfo.new(0.35),{Position=UDim2.new(1,320,old.Frame.Position.Y.Scale,old.Frame.Position.Y.Offset), BackgroundTransparency=1}):Play()
-                end)
-                task.delay(0.38,function() if old.Frame and old.Frame.Destroy then pcall(function() old.Frame:Destroy() end) end end)
-            end
-        end
-        for idx,obj in ipairs(self.Notifs) do
-            local targetPos=UDim2.new(1,-320,1,-70-((idx-1)*70))
-            pcall(function() TweenService:Create(obj.Frame,TweenInfo.new(0.25,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=targetPos}):Play() end)
-        end
-    end
+    -- Notificação individual
+    local notif = create("Frame", {
+        Parent = notifContainer,
+        Size = UDim2.new(1, 0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+        ClipsDescendants = true
+    })
+    create("UICorner", { Parent = notif, CornerRadius = UDim.new(0, 8) })
+    addShadow(notif)
 
-    local newIdx=#self.Notifs+1
-    local notif=createNotificationFrame(newIdx)
-    table.insert(self.Notifs,notif)
-    local finalPos=UDim2.new(1,-320,1,-70-((newIdx-1)*70))
-    pcall(function()
-        TweenService:Create(notif.Frame,TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Position=finalPos,BackgroundTransparency=0}):Play()
-        TweenService:Create(notif.Title,TweenInfo.new(0.28),{TextTransparency=0}):Play()
-        TweenService:Create(notif.Body,TweenInfo.new(0.28),{TextTransparency=0}):Play()
-    end)
+    local notifTitle = create("TextLabel", {
+        Parent = notif,
+        Text = tostring(title),
+        Size = UDim2.new(1, -10, 0, 20),
+        Position = UDim2.new(0, 10, 0, 5),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
 
-    for idx,obj in ipairs(self.Notifs) do
-        local target=UDim2.new(1,-320,1,-70-((idx-1)*70))
-        pcall(function() TweenService:Create(obj.Frame,TweenInfo.new(0.25,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=target}):Play() end)
-    end
+    local notifText = create("TextLabel", {
+        Parent = notif,
+        Text = tostring(text),
+        Size = UDim2.new(1, -10, 0, 20),
+        Position = UDim2.new(0, 10, 0, 28),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
 
-    task.delay(dur,function()
-        local foundIndex=nil
-        for i,o in ipairs(self.Notifs) do
-            if o==notif then foundIndex=i break end
-        end
-        if foundIndex then
-            local obj=table.remove(self.Notifs,foundIndex)
-            if obj and obj.Frame then
-                pcall(function()
-                    TweenService:Create(obj.Title,TweenInfo.new(0.25),{TextTransparency=1}):Play()
-                    TweenService:Create(obj.Body,TweenInfo.new(0.25),{TextTransparency=1}):Play()
-                    TweenService:Create(obj.Frame,TweenInfo.new(0.35),{Position=UDim2.new(1,320,obj.Frame.Position.Y.Scale,obj.Frame.Position.Y.Offset),BackgroundTransparency=1}):Play()
-                end)
-                task.delay(0.38,function() if obj.Frame and obj.Frame.Destroy then pcall(function() obj.Frame:Destroy() end) end end)
-            end
-            for idx,remaining in ipairs(self.Notifs) do
-                local targetPos=UDim2.new(1,-320,1,-70-((idx-1)*70))
-                pcall(function() TweenService:Create(remaining.Frame,TweenInfo.new(0.25,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=targetPos}):Play() end)
-            end
-        end
+    -- Animação de entrada
+    TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(1, 0, 0, 60)
+    }):Play()
+
+    -- Remover após o tempo
+    task.delay(duration, function()
+        TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Size = UDim2.new(1, 0, 0, 0)
+        }):Play()
+        wait(0.3)
+        notif:Destroy()
     end)
 end
-
-return LastOneHub
