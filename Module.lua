@@ -45,12 +45,13 @@ function LastOneHub.new(title)
         oldGui:Destroy()
     end
 
-    local self = setmetatable({}, LastOneHub)
-    self.Gui = create("ScreenGui", {
-        Parent = game:GetService("CoreGui"),
-        ResetOnSpawn = false,
-        Name = "LastoneHub"
-    })
+    self = setmetatable({}, LastOneHub)
+
+self.Gui = create("ScreenGui", {
+    Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"),
+    ResetOnSpawn = false,
+    Name = "LastoneHub"
+})
 
     -- Janela Principal
     self.Main = create("Frame", {
