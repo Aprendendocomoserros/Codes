@@ -592,3 +592,4 @@ function LastOneHub:Destroy()
     -- destroi GUI
     pcall(function() if self.Gui and self.Gui.Destroy then self.Gui:Destroy() end end)
 end
+return LastOneHub
