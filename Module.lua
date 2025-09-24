@@ -511,7 +511,7 @@ function LastOneHub:Notify(title, text, dur)
         end
     end)
 end
-
+return LastOneHub
 ----------------------------
 -- Return module
 ----------------------------
