@@ -1,4 +1,4 @@
--- Module: LastOneHub (com suporte a celular / touch)
+-- Módulo: LastOneHub (com proteção contra nil e melhorias)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -16,23 +16,14 @@ local function create(class, props)
     return inst
 end
 
-----------------------------
--- Construtor
-----------------------------
 function LastOneHub.new(title)
     local oldGui = game:GetService("CoreGui"):FindFirstChild("LastoneHub")
-    if oldGui then
-        pcall(function() oldGui:Destroy() end)
-    end
+    if oldGui then pcall(function() oldGui:Destroy() end) end
 
     local self = setmetatable({}, LastOneHub)
-
-    -- Detecta se é dispositivo touch (celular/tablet)
     local isTouch = UserInputService.TouchEnabled == true
 
-    self.Gui = create("ScreenGui", { Parent = game:GetService("CoreGui"), ResetOnSpawn = false, Name = "LastoneHub" })
-
-    -- tamanho padrão e reduzido para celular
+    self.Gui = create("ScreenGui", {Parent = game:GetService("CoreGui"), ResetOnSpawn = false, Name = "LastoneHub"})
     local mainSize = isTouch and UDim2.new(0, 360, 0, 260) or UDim2.new(0, 500, 0, 350)
     local mainPos = UDim2.new(0.5, -(mainSize.X.Offset/2), 0.5, -(mainSize.Y.Offset/2))
 
@@ -41,80 +32,65 @@ function LastOneHub.new(title)
         Size = mainSize,
         Position = mainPos,
         BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-        ClipsDescendants = true,
-        AnchorPoint = Vector2.new(0,0)
+        ClipsDescendants = true
     })
 
-    local top = create("Frame", { Parent = self.Main, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Color3.fromRGB(30, 30, 30), Name = "TopBar" })
+    local top = create("Frame", {Parent = self.Main, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Color3.fromRGB(30, 30, 30), Name = "TopBar"})
     create("TextLabel", {
-        Parent = top,
-        Text = title or "LastOneHub",
-        Size = UDim2.new(1, -40, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        TextColor3 = Color3.new(1, 1, 1),
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Font = Enum.Font.GothamSemibold,
-        TextSize = 16
+        Parent = top, Text = title or "LastOneHub",
+        Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 10, 0, 0),
+        TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamSemibold, TextSize = 16
     })
 
     local closeBtn = create("TextButton", {
-        Parent = top,
-        Text = "X",
-        Size = UDim2.new(0, 30, 1, 0),
-        Position = UDim2.new(1, -30, 0, 0),
-        BackgroundColor3 = Color3.fromRGB(170, 0, 0),
-        TextColor3 = Color3.new(1, 1, 1)
+        Parent = top, Text = "X", Size = UDim2.new(0, 30, 1, 0),
+        Position = UDim2.new(1, -30, 0, 0), BackgroundColor3 = Color3.fromRGB(170, 0, 0), TextColor3 = Color3.new(1, 1, 1)
     })
-    create("UICorner", { Parent = closeBtn, CornerRadius = UDim.new(0, 4) })
+    create("UICorner", {Parent = closeBtn, CornerRadius = UDim.new(0, 4)})
 
-    closeBtn.MouseButton1Click:Connect(function()
-        pcall(function() self.Gui.Enabled = false end)
-        if self.OnClose then pcall(self.OnClose) end
-    end)
+    if closeBtn then
+        closeBtn.MouseButton1Click:Connect(function()
+            if self.Gui then self.Gui.Enabled = false end
+            if self.OnClose then pcall(self.OnClose) end
+        end)
+    end
 
-    -- Drag da janela (mouse + touch)
+    -- Sistema de drag seguro
     local dragging, dragInput, dragStart, startPos
     local function beginDrag(input)
         dragging = true
         dragStart = input.Position
         startPos = self.Main.Position
-        -- on end
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+
+    if top then
+        top.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                beginDrag(input)
+            end
+        end)
+        top.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
             end
         end)
     end
 
-    top.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            beginDrag(input)
-        elseif input.UserInputType == Enum.UserInputType.Touch then
-            beginDrag(input)
-        end
-    end)
-
-    top.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging and dragStart and startPos then
             local delta = input.Position - dragStart
-            local sx, ox = startPos.X.Scale, startPos.X.Offset
-            local sy, oy = startPos.Y.Scale, startPos.Y.Offset
-            self.Main.Position = UDim2.new(sx, ox + delta.X, sy, oy + delta.Y)
+            self.Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 
-    -- Sidebar e container de abas
-    self.Sidebar = create("Frame", { Parent = self.Main, Size = UDim2.new(0, 120, 1, -30), Position = UDim2.new(0, 0, 0, 30), BackgroundColor3 = Color3.fromRGB(35, 35, 35) })
-    create("UIListLayout", { Parent = self.Sidebar, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5) })
+    self.Sidebar = create("Frame", {Parent = self.Main, Size = UDim2.new(0, 120, 1, -30), Position = UDim2.new(0, 0, 0, 30), BackgroundColor3 = Color3.fromRGB(35, 35, 35)})
+    create("UIListLayout", {Parent = self.Sidebar, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
 
-    self.TabHolder = create("Frame", { Parent = self.Main, Size = UDim2.new(1, -120, 1, -30), Position = UDim2.new(0, 120, 0, 30), BackgroundColor3 = Color3.fromRGB(50, 50, 50) })
+    self.TabHolder = create("Frame", {Parent = self.Main, Size = UDim2.new(1, -120, 1, -30), Position = UDim2.new(0, 120, 0, 30), BackgroundColor3 = Color3.fromRGB(50, 50, 50)})
     self.Tabs = {}
     self.Keybinds = {}
     self.Notifs = {}
