@@ -719,7 +719,8 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 		if increment <= 0 then increment = max end
 	end
 
-	default = math.clamp(default or min, min, max)
+	-- Armazena o valor atual. Usaremos 'currentValue' como a variável de estado.
+	local currentValue = math.clamp(default or min, min, max)
 
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
@@ -733,7 +734,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 	-- LABEL
 	local lbl = create("TextLabel", {
 		Parent = frame,
-		Text = string.format("%s: %d", tostring(text or "Slider"), default),
+		Text = string.format("%s: %d", tostring(text or "Slider"), currentValue),
 		Size = UDim2.new(0.75, 0, 0, 20),
 		Position = UDim2.new(0, 8, 0, 6),
 		BackgroundTransparency = 1,
@@ -749,7 +750,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 		Size = UDim2.new(0, 38, 0, 38),
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -10, 0, 6),
-		Text = tostring(default),
+		Text = tostring(currentValue),
 		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
 		TextColor3 = Color3.fromRGB(220, 220, 220),
 		Font = Enum.Font.GothamBold,
@@ -789,7 +790,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 	-- FILL
 	local fill = create("Frame", {
 		Parent = bar,
-		Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+		Size = UDim2.new((currentValue - min) / (max - min), 0, 1, 0),
 		BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 	})
 	create("UICorner", { Parent = fill, CornerRadius = UDim.new(0, 5) })
@@ -846,12 +847,16 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 
 	local dragging = false
 
-	-- FUNÇÃO UPDATE SLIDER (definida ANTES do inputCircle.FocusLost)
-	local function updateSlider(val, instant)
-		val = clampToIncrement(val)
-		if val > max then val = max end
-
-		local pct = (val - min) / (max - min)
+	-- FUNÇÃO UPDATE SLIDER (atualizada para usar currentValue)
+	local function updateSlider(val, instant, fireCallback)
+		local newVal = clampToIncrement(val)
+		
+		-- Verifica se o valor mudou antes de atualizar a UI/Callback
+		if newVal == currentValue and not instant then return end
+        
+		currentValue = newVal
+        
+		local pct = (currentValue - min) / (max - min)
 
 		TweenService:Create(fill, TweenInfo.new(instant and 0 or 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			Size = UDim2.new(pct, 0, 1, 0)
@@ -861,10 +866,10 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 			Position = UDim2.new(pct, 0, 0.5, 0)
 		}):Play()
 
-		lbl.Text = string.format("%s: %d", text, val)
-		inputCircle.Text = tostring(val)
+		lbl.Text = string.format("%s: %d", text, currentValue)
+		inputCircle.Text = tostring(currentValue)
 
-		if callback then task.spawn(callback, val) end
+		if fireCallback ~= false and callback then task.spawn(callback, currentValue) end
 	end
 
 	inputCircle.Focused:Connect(function()
@@ -874,12 +879,11 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 		TweenService:Create(glow, TweenInfo.new(0.4), {ImageTransparency = 0.8}):Play()
 		local num = tonumber(inputCircle.Text)
 		if num then
-			num = clampToIncrement(num)
-			if num > max then num = max end
-			inputCircle.Text = tostring(num)
+			-- Aqui, updateSlider irá atualizar currentValue e a UI
 			updateSlider(num, true)
 		else
-			inputCircle.Text = tostring(default)
+			-- Volta para o último valor válido
+			inputCircle.Text = tostring(currentValue)
 		end
 	end)
 
@@ -887,7 +891,8 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 	bar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
-			updateSlider((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X * (max-min) + min)
+			-- Passa false para 'instant'
+			updateSlider((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X * (max-min) + min, false) 
 		end
 	end)
 
@@ -899,13 +904,31 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			updateSlider((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X * (max-min) + min)
+			-- Passa false para 'instant'
+			updateSlider((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X * (max-min) + min, false)
 		end
 	end)
 
-	updateSlider(default, true)
+	-- Dispara o estado inicial
+	updateSlider(currentValue, true)
 	self:UpdateScrolling(tab)
-	return frame
+    
+	-----------------------------------------------------
+	-- SISTEMA SET/GET para Slider
+	-----------------------------------------------------
+    local SliderObject = {}
+    
+    -- Permite definir o valor do slider programaticamente
+    function SliderObject:Set(value)
+        updateSlider(value, false) -- Anima a transição
+    end
+    
+    -- Permite obter o valor atual
+    function SliderObject:Get()
+        return currentValue
+    end
+
+	return setmetatable(SliderObject, {__index = SliderObject})
 end
 
 function SawMillHub:CreateDropdown(tab, text, options, callback)
@@ -915,6 +938,11 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 
 	if not self.Tabs[tab] then return end
 	options = options or {}
+
+	-- Variáveis de Estado
+	local open = false
+	local checkMarks = {} -- Mapeamento: { [OptionName] = CheckMarkInstance }
+	local currentValue = nil
 
 	-- Definição de Cores
 	local neonBlue = NEON_BLUE
@@ -971,7 +999,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		BackgroundTransparency = 1,
 		TextColor3 = neonBlue,
 		Font = Enum.Font.GothamBlack,
-		TextSize = 25, 
+		TextSize = 25, 
 		ZIndex = 2
 	})
 
@@ -1002,9 +1030,40 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	create("UIPadding", { Parent = list, PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
 
 
-	local open = false
-	local selected = nil
+	-- FUNÇÃO AUXILIAR PARA SELECIONAR UMA OPÇÃO
+	local function selectOption(optionName, skipToggle, fireCallback)
+		if currentValue == optionName then return end -- Evita processamento se já estiver selecionado
 
+		-- 1. Desmarca o ícone anterior
+		if currentValue and checkMarks[currentValue] then
+			checkMarks[currentValue].Visible = false
+		end
+        
+        -- 2. Atualiza o estado e a UI
+        currentValue = optionName
+        
+        if checkMarks[optionName] then
+            checkMarks[optionName].Visible = true
+        end
+
+		btnLabel.Text = text .. ": " .. optionName -- Atualiza o texto do botão principal
+		TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play() -- Destaca o texto selecionado
+		task.delay(0.5, function()
+			TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+		end)
+
+		-- 3. Fecha o dropdown se não for pular
+		if not skipToggle then
+            -- Note: Estamos chamando toggleDropdown (que irá verificar o estado 'open')
+            if open then 
+			    toggleDropdown()
+            end
+		end
+        
+        -- 4. Dispara o callback
+		if fireCallback ~= false and callback then pcall(callback, optionName) end
+	end
+    
 	-- ABRIR / FECHAR DROPDOWN (Com Animação de Altura)
 	local function toggleDropdown()
 		open = not open
@@ -1038,7 +1097,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	btn.MouseButton1Click:Connect(toggleDropdown)
 
 	-- CRIAR OPÇÕES
-	for _, opt in ipairs(options) do
+	for i, opt in ipairs(options) do
 		local optBtn = create("TextButton", {
 			Parent = list,
 			Text = "",
@@ -1074,6 +1133,15 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			Visible = false
 		})
 
+		-- Mapeia a caixa de seleção
+		checkMarks[opt] = check
+        
+        -- Define o valor inicial se for o primeiro item
+        if i == 1 then
+            currentValue = opt
+            check.Visible = true
+        end
+        
 		-- HOVER ANIMADO
 		optBtn.MouseEnter:Connect(function()
 			TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = optionHover}):Play()
@@ -1082,33 +1150,51 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			TweenService:Create(optBtn, TweenInfo.new(0.2), {BackgroundColor3 = optionBackground}):Play()
 		end)
 
-		-- SELEÇÃO
+		-- SELEÇÃO POR CLIQUE
 		optBtn.MouseButton1Click:Connect(function()
-			if selected then selected.Visible = false end
-			check.Visible = true
-			selected = check
-
-			btnLabel.Text = text .. ": " .. opt -- Atualiza o texto do botão principal
-			TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play() -- Destaca o texto selecionado
-			task.delay(0.5, function()
-				TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
-			end)
-
-			toggleDropdown()
-			if callback then pcall(callback, opt) end
+			selectOption(opt, false, true) -- Não pula o toggle, dispara o callback
 		end)
 	end
 
-	-- Inicializa o texto
-	btnLabel.Text = text .. ": (Selecione)"
+	-- Inicializa o texto com o primeiro item ou 'Selecione'
+	if currentValue then
+		btnLabel.Text = text .. ": " .. currentValue
+	else
+		btnLabel.Text = text .. ": (Selecione)"
+	end
+    
+    -- Dispara o callback inicial
+    if currentValue and callback then pcall(callback, currentValue) end
 
 	self:UpdateScrolling(tab)
-	return frame
+    
+	-----------------------------------------------------
+	-- SISTEMA SET/GET para Dropdown
+	-----------------------------------------------------
+    local DropdownObject = {}
+    
+    -- Permite definir o valor do Dropdown programaticamente
+    function DropdownObject:Set(optionName)
+        if checkMarks[optionName] then
+            -- Atualiza a UI e dispara o callback
+            selectOption(optionName, true, true) 
+        end
+    end
+    
+    -- Permite obter o valor selecionado
+    function DropdownObject:Get()
+        return currentValue
+    end
+
+	return setmetatable(DropdownObject, {__index = DropdownObject})
 end
 
 function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	if not self.Tabs[tab] then return end
 
+	-- Variável de serviço (necessária para as funções internas)
+	local TweenService = game:GetService("TweenService")
+	
 	-- FRAME PRINCIPAL
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
@@ -1187,7 +1273,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 		ZIndex = 3
 	})
 
-	-- FUNÇÃO PARA PLACEHOLDER
+	-- FUNÇÃO PARA PLACEHOLDER (corrigida para usar Text)
 	local function updatePlaceholder()
 		if box.Text == "" and not box:IsFocused() then
 			TweenService:Create(placeholderLbl, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
@@ -1236,13 +1322,34 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	box:GetPropertyChangedSignal("Text"):Connect(updatePlaceholder)
 
 	self:UpdateScrolling(tab)
-	return box
+    
+	-----------------------------------------------------
+	-- SISTEMA SET/GET para Input
+	-----------------------------------------------------
+    local InputObject = {}
+    
+    -- Permite definir o texto do Input programaticamente
+    function InputObject:Set(newText)
+        box.Text = tostring(newText or "")
+        updatePlaceholder() -- Atualiza o placeholder
+    end
+    
+    -- Permite obter o texto atual
+    function InputObject:Get()
+        return box.Text
+    end
+
+	return setmetatable(InputObject, {__index = InputObject})
 end
 -----------------------------------------------------
 -- KEYBIND NEON ÉPICO (Animado + Pulse + Glow)
 -----------------------------------------------------
 function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	if not self.Tabs[tab] then return end
+    
+    -- Certifica-se de que TweenService está disponível
+    local TweenService = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
 
 	-- FRAME
 	local frame = create("Frame", {
@@ -1303,9 +1410,24 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	local selectedKey = defaultKey or Enum.KeyCode.Unknown
 	local waiting = false
 
+	-- FUNÇÃO CENTRAL PARA DEFINIR A TECLA
 	local function setKey(newKey)
-		selectedKey = newKey
-		btn.Text = newKey.Name
+		-- Garante que a nova chave é um Enum.KeyCode
+		if typeof(newKey) == "EnumItem" and newKey.EnumType == Enum.KeyCode then
+			selectedKey = newKey
+			btn.Text = newKey.Name
+		elseif type(newKey) == "string" then
+             -- Tenta converter string (ex: "LeftShift") para KeyCode
+            local success, key = pcall(function() return Enum.KeyCode[newKey] end)
+            if success and key then
+                selectedKey = key
+                btn.Text = key.Name
+            end
+        else
+            -- Se for KeyCode.Unknown ou inválido
+            selectedKey = Enum.KeyCode.Unknown
+            btn.Text = "Nenhuma"
+        end
 
 		-- pulse neon
 		TweenService:Create(btnStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {Transparency = 0}):Play()
@@ -1316,6 +1438,10 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 
 		if callback then pcall(callback, selectedKey) end
 	end
+    
+    -- Chama a função setKey para inicializar corretamente com defaultKey
+    setKey(defaultKey or Enum.KeyCode.Unknown)
+
 
 	btn.MouseEnter:Connect(function()
 		TweenService:Create(btnStroke, TweenInfo.new(0.3), {Transparency = 0}):Play()
@@ -1338,9 +1464,11 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 		local conn
 		conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
-				setKey(input.KeyCode)
+                -- Define a nova chave e desliga o modo de espera
+				setKey(input.KeyCode) 
 				waiting = false
 				conn:Disconnect()
+				-- Restaura o visual
 				TweenService:Create(btnStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(0, 255, 255), Transparency = 0.5}):Play()
 				TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35,35,35)}):Play()
 			end
@@ -1348,7 +1476,7 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	end)
 
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if not gameProcessed and input.KeyCode == selectedKey and not waiting then
+		if not gameProcessed and input.KeyCode == selectedKey and not waiting and selectedKey ~= Enum.KeyCode.Unknown then
 			if callback then pcall(callback, selectedKey) end
 		end
 	end)
@@ -1365,10 +1493,23 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	end)
 
 	self:UpdateScrolling(tab)
-	return {
-		Get = function() return selectedKey end,
-		Set = function(_, newKey) setKey(newKey) end
-	}
+    
+	-----------------------------------------------------
+	-- SISTEMA SET/GET para Keybind
+	-----------------------------------------------------
+    local KeybindObject = {}
+    
+    -- Permite obter a chave selecionada
+    function KeybindObject:Get()
+        return selectedKey
+    end
+
+    -- Permite definir a chave programaticamente. Aceita KeyCode ou o nome da chave (string).
+    function KeybindObject:Set(newKey) 
+        setKey(newKey)
+    end
+    
+	return setmetatable(KeybindObject, {__index = KeybindObject})
 end
 
 -----------------------------------------------------
