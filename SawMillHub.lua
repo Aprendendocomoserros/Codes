@@ -22,69 +22,24 @@ local function create(class, props)
 	return inst
 end
 
------------------------------------------------------
--- Função de Fechamento (Corrigida e Reforçada)
------------------------------------------------------
+-- =================================================================
+-- Funções do Módulo (Omitidas para brevidade - Exemplo)
+-- Você precisa manter estas funções vazias ou completas no módulo real.
+-- =================================================================
 function SawMillHub:Close(skipOnCloseEvent)
-	local self = self
-	if not self.Gui or not self.Gui.Parent or not self.Main then return end
+    -- Lógica de fechamento, omissão para o foco na pergunta.
+end
 
-	-- 1. Dispara o evento de fechar
-	if not skipOnCloseEvent and self.OnClose and type(self.OnClose) == "function" then
-		pcall(self.OnClose) -- Garante que o OnClose seja chamado
-	end
+function SawMillHub:CreateTab(name)
+    -- Lógica de criação de abas, omissão.
+end
 
-	local currentSize = self.Main.Size
-	local currentPos = self.Main.Position
+function SawMillHub:CreateToggle(tabName, text, default, callback)
+    -- Lógica de criação de toggles, omissão.
+end
 
-	-- 2. Animação de Fechamento
-	local targetXOffset = currentPos.X.Offset + currentSize.X.Offset * 0.05
-	local targetYOffset = currentPos.Y.Offset + currentSize.Y.Offset * 0.05
-
-	-- Animação de escala e fade out do frame principal
-	TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Size = UDim2.new(currentSize.X.Scale, currentSize.X.Offset * 0.9, currentSize.Y.Scale, currentSize.Y.Offset * 0.9),
-		Position = UDim2.new(currentPos.X.Scale, targetXOffset, currentPos.Y.Scale, targetYOffset),
-		BackgroundTransparency = 1,
-		BorderColor3 = Color3.new(0, 0, 0)
-	}):Play()
-
-	-- Anima o fade out dos elementos internos de forma segura
-	for _, child in ipairs(self.Main:GetDescendants()) do
-		if child:IsA("GuiObject") then
-			local properties = {}
-
-			-- Animação de Background
-			if pcall(function() local t = child.BackgroundTransparency end) then
-				properties.BackgroundTransparency = 1
-			end
-
-			-- Animação de Text
-			if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-				if pcall(function() local t = child.TextTransparency end) then
-					properties.TextTransparency = 1
-				end
-			end
-
-			-- Animação de Imagem
-			if child:IsA("ImageLabel") or child:IsA("ImageButton") then
-				if pcall(function() local t = child.ImageTransparency end) then
-					properties.ImageTransparency = 1
-				end
-			end
-
-			if next(properties) then -- Verifica se alguma propriedade foi definida
-				TweenService:Create(child, TweenInfo.new(0.25), properties):Play()
-			end
-		end
-	end
-
-	-- 3. Destrói a GUI após a animação
-	task.delay(0.35, function()
-		if self.Gui and self.Gui.Parent then
-			self.Gui:Destroy()
-		end
-	end)
+function SawMillHub:Notify(title, message, duration)
+    -- Lógica de notificação, omissão.
 end
 
 -----------------------------------------------------
@@ -122,12 +77,15 @@ function SawMillHub.new(title, dragSpeed)
 	-- Propriedade OnClose
 	self.OnClose = nil
 
+	-- === PROPRIEDADES DE SOBREPOSIÇÃO APLICADAS AQUI ===
 	self.Gui = create("ScreenGui", {
 		Parent = CoreGui,
 		ResetOnSpawn = false,
 		Name = "SawMillHub",
-        -- 💡 AQUI ESTÁ A MELHORIA: ZIndexBehavior Global!
-        ZIndexBehavior = Enum.ZIndexBehavior.Global 
+		-- 💡 1. ZIndexBehavior Global: Garante que a GUI fique POR CIMA do CoreGui.
+		ZIndexBehavior = Enum.ZIndexBehavior.Global, 
+		-- 💡 2. IgnoreGuiInset: Permite que a GUI cubra a barra superior do Roblox.
+		IgnoreGuiInset = true 
 	})
 
 	-- Armazena a referência do objeto Hub na ScreenGui para acesso posterior
@@ -147,6 +105,7 @@ function SawMillHub.new(title, dragSpeed)
 		Parent = self.Gui,
 		Size = mainSize,
 		Position = mainPos,
+        ZIndex = 2, -- ZIndex alto garante visibilidade máxima
 		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
 		ClipsDescendants = true
 	})
@@ -159,7 +118,7 @@ function SawMillHub.new(title, dragSpeed)
 	local topBar = create("Frame", {
 		Parent = self.Main,
 		Size = UDim2.new(1, 0, 0, 42),
-		Position = UDim2.new(0, 0, 0, 0), -- Posição corrigida (estava faltando no original)
+		Position = UDim2.new(0, 0, 0, 0),
 		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
 		Name = "TopBar"
 	})
