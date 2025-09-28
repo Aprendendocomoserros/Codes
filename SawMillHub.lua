@@ -277,15 +277,50 @@ function SawMillHub.new(title, dragSpeed)
 	-----------------------------------------------------
 	-- Sistema de Drag com efeito “Lag”
 	-----------------------------------------------------
+	-----------------------------------------------------
+	-- Sistema de Drag com efeito “Lag” (Corrigido para FPS)
+	-----------------------------------------------------
 	local dragging = false
 	local dragInput, dragStart, startPos
 	local targetPos = self.Main.Position
+    
+    -- Novo: Variável de controle para o modo secundário de arrastar
+    local canDrag = false 
 
 	-- Define quão rápido o frame segue o mouse
 	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 -- Slow = devagar, Default = instantâneo
 
+    ----------------------------------------------------------------
+    -- LÓGICA DE DRAG SECUNDÁRIO: Pressionar 'LeftShift' para habilitar o arrasto
+    ----------------------------------------------------------------
+    local function checkDragKey(input, state)
+        -- Você pode mudar LeftShift para LeftControl, RightClick, etc.
+        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightControl then
+            canDrag = state 
+            UserInputService.MouseIconEnabled = canDrag -- Mostra/Esconde o cursor
+        end
+    end
+
+    -- Eventos para habilitar o arrasto (segurando a tecla)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        checkDragKey(input, true)
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        checkDragKey(input, false)
+        -- Também garante que o drag termine se a tecla for solta
+        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightControl then
+            if dragging then
+                dragging = false
+            end
+        end
+    end)
+    ----------------------------------------------------------------
+
 	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        -- O drag só começa se a tecla secundária estiver pressionada OU se for um input normal (fora de modo FPS)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and (not LocalPlayer.CameraMode.Lock and not canDrag) or canDrag then
 			dragging = true
 			dragStart = input.Position
 			startPos = self.Main.Position
