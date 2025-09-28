@@ -6,7 +6,7 @@ local DebrisService = game:GetService("Debris") -- Adicionado
 local Workspace = game:GetService("Workspace") -- Adicionado
 
 local LocalPlayer = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui") 
+local CoreGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
