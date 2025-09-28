@@ -465,101 +465,21 @@ function SawMillHub:CreateLabel(tab, text)
 	end)
 
 	self:UpdateScrolling(tab)
-	return frame
-end
-
------------------------------------------------------
--- Botão Profissional Moderno
------------------------------------------------------
-function SawMillHub:CreateButton(tab, text, callback)
-	if not self.Tabs[tab] then return end
-
-	local btn = create("TextButton", {
-		Parent = self.Tabs[tab].Container,
-		Text = tostring(text or ""),
-		Size = UDim2.new(1, -10, 0, 42),
-		BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-		TextColor3 = Color3.fromRGB(235, 235, 235),
-		Font = Enum.Font.GothamSemibold,
-		TextSize = 15,
-		AutoButtonColor = false
-	})
-	create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 10) })
-
-	-- Stroke que muda de cor ao clicar
-	local stroke = create("UIStroke", {
-		Parent = btn,
-		Color = Color3.fromRGB(70, 70, 70),
-		Thickness = 1.5,
-		Transparency = 0.3
-	})
-
-	-- Sombra leve
-	local shadow = create("ImageLabel", {
-		Parent = btn,
-		Size = UDim2.new(1, 10, 1, 10),
-		Position = UDim2.new(0, -5, 0, -2),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://1316045217", -- sombra suave
-		ImageColor3 = Color3.new(0, 0, 0),
-		ImageTransparency = 0.8,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(10, 10, 118, 118),
-		ZIndex = 0
-	})
-
+    
+    -----------------------------------------------------
+	-- SISTEMA SET/GET para Label
 	-----------------------------------------------------
-	-- Hover Effect (PC e Mobile)
-	-----------------------------------------------------
-	btn.MouseEnter:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-		}):Play()
-	end)
-	btn.MouseLeave:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-		}):Play()
-	end)
+    local LabelObject = {}
+    
+    -- Permite definir um novo texto para o Label
+    function LabelObject:SetText(newText)
+        lbl.Text = tostring(newText or "")
+    end
+    
+    -- Opcional: retorna o frame principal também
+    LabelObject.Frame = frame
 
-	-----------------------------------------------------
-	-- Click Feedback (toque/click)
-	-----------------------------------------------------
-	btn.MouseButton1Down:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.1), {
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-			TextColor3 = Color3.fromRGB(180, 220, 255)
-		}):Play()
-
-		TweenService:Create(stroke, TweenInfo.new(0.15), {
-			Color = Color3.fromRGB(100, 160, 255),
-			Transparency = 0
-		}):Play()
-	end)
-
-	btn.MouseButton1Up:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25), {
-			BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-			TextColor3 = Color3.fromRGB(235, 235, 235)
-		}):Play()
-
-		TweenService:Create(stroke, TweenInfo.new(0.25), {
-			Color = Color3.fromRGB(70, 70, 70),
-			Transparency = 0.3
-		}):Play()
-	end)
-
-	-----------------------------------------------------
-	-- Execução do callback
-	-----------------------------------------------------
-	btn.MouseButton1Click:Connect(function()
-		if callback then
-			pcall(callback)
-		end
-	end)
-
-	self:UpdateScrolling(tab)
-	return btn
+	return setmetatable(LabelObject, {__index = LabelObject})
 end
 
 function SawMillHub:CreateToggle(tab, text, default, callback)
