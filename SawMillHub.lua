@@ -2,12 +2,19 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local DebrisService = game:GetService("Debris") -- Adicionado
+local Workspace = game:GetService("Workspace") -- Adicionado
 
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui") 
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
+
+-- Variáveis Globais de Design (Movidas para o topo para consistência)
+local NEON_COLOR = Color3.fromRGB(0, 170, 255)
+local ACCENT_COLOR = Color3.fromRGB(40, 40, 40)
+local BASE_COLOR = Color3.fromRGB(30, 30, 30)
 
 -----------------------------------------------------
 -- Criador seguro de Instâncias
@@ -16,7 +23,8 @@ local function create(class, props)
 	local inst = Instance.new(class)
 	if props then
 		for k, v in pairs(props) do
-			pcall(function() inst[k] = v end)
+			-- Usando pcall para evitar quebras em propriedades de somente leitura
+			pcall(function() inst[k] = v end) 
 		end
 	end
 	return inst
@@ -27,22 +35,23 @@ end
 -----------------------------------------------------
 function SawMillHub:Close(skipOnCloseEvent)
 	local self = self
-	if not self.Gui or not self.Gui.Parent or not self.Main then return end
+	-- Mudado self.Main para self.MainFrame, que é o nome dado no construtor
+	if not self.Gui or not self.Gui.Parent or not self.MainFrame then return end
 
 	-- 1. Dispara o evento de fechar
 	if not skipOnCloseEvent and self.OnClose and type(self.OnClose) == "function" then
 		pcall(self.OnClose)
 	end
 
-	local currentSize = self.Main.Size
-	local currentPos = self.Main.Position
+	local currentSize = self.MainFrame.Size
+	local currentPos = self.MainFrame.Position
 
 	-- 2. Animação de Fechamento
 	local targetXOffset = currentPos.X.Offset + currentSize.X.Offset * 0.05
 	local targetYOffset = currentPos.Y.Offset + currentSize.Y.Offset * 0.05
 
 	-- Animação de escala e fade out do frame principal
-	TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+	TweenService:Create(self.MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 		Size = UDim2.new(currentSize.X.Scale, currentSize.X.Offset * 0.9, currentSize.Y.Scale, currentSize.Y.Offset * 0.9),
 		Position = UDim2.new(currentPos.X.Scale, targetXOffset, currentPos.Y.Scale, targetYOffset),
 		BackgroundTransparency = 1,
@@ -50,7 +59,7 @@ function SawMillHub:Close(skipOnCloseEvent)
 	}):Play()
 
 	-- Anima o fade out dos elementos internos de forma segura
-	for _, child in ipairs(self.Main:GetDescendants()) do
+	for _, child in ipairs(self.MainFrame:GetDescendants()) do
 		if child:IsA("GuiObject") then
 			local properties = {}
 
@@ -105,7 +114,7 @@ function SawMillHub.new(title, dragSpeed)
 			if oldHubInstance and oldHubInstance.Close then
 				-- Chama o Close() da instância antiga, disparando o OnClose dela.
 				task.spawn(function()
-					oldHubInstance:Close()
+					oldHubInstance:Close(true) -- Passa true para evitar loop se a função close disparar o OnClose
 				end)
 			else
 				pcall(function() oldGui:Destroy() end)
@@ -141,21 +150,21 @@ function SawMillHub.new(title, dragSpeed)
 	local mainPos = UDim2.new(0.5, -(mainSize.X.Offset/2), 0.5, -(mainSize.Y.Offset/2))
 
 	-- Janela Principal
-	self.Main = create("Frame", {
+	self.MainFrame = create("Frame", { -- Renomeado de 'self.Main' para 'self.MainFrame' para clareza e consistência
 		Parent = self.Gui,
 		Size = mainSize,
 		Position = mainPos,
 		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
 		ClipsDescendants = true
 	})
-	create("UICorner", { Parent = self.Main, CornerRadius = UDim.new(0, 12) })
-	create("UIStroke", { Parent = self.Main, Color = Color3.fromRGB(70, 70, 70), Thickness = 1.5 })
+	create("UICorner", { Parent = self.MainFrame, CornerRadius = UDim.new(0, 12) })
+	create("UIStroke", { Parent = self.MainFrame, Color = Color3.fromRGB(70, 70, 70), Thickness = 1.5 })
 
 	-----------------------------------------------------
 	-- Barra Superior
 	-----------------------------------------------------
 	local topBar = create("Frame", {
-		Parent = self.Main,
+		Parent = self.MainFrame,
 		Size = UDim2.new(1, 0, 0, 42),
 		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
 		Name = "TopBar"
@@ -270,8 +279,8 @@ function SawMillHub.new(title, dragSpeed)
 	-----------------------------------------------------
 	local dragging = false
 	local dragInput, dragStart, startPos
-	local targetPos = self.Main.Position
-
+	local targetPos = self.MainFrame.Position -- Usando self.MainFrame
+	
 	-- Define quão rápido o frame segue o mouse
 	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 -- Slow = devagar, Default = instantâneo
 
@@ -279,7 +288,7 @@ function SawMillHub.new(title, dragSpeed)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
-			startPos = self.Main.Position
+			startPos = self.MainFrame.Position -- Usando self.MainFrame
 			dragInput = input
 		end
 	end)
@@ -302,8 +311,8 @@ function SawMillHub.new(title, dragSpeed)
 
 	-- RenderLoop para animação suave
 	RunService.RenderStepped:Connect(function(dt)
-		if dragging or (self.Main.Position ~= targetPos) then
-			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
+		if dragging or (self.MainFrame.Position ~= targetPos) then -- Usando self.MainFrame
+			self.MainFrame.Position = self.MainFrame.Position:Lerp(targetPos, lerpSpeed) -- Usando self.MainFrame
 		end
 	end)
 
@@ -317,7 +326,7 @@ function SawMillHub.new(title, dragSpeed)
 	-- Sidebar + TabHolder
 	-----------------------------------------------------
 	self.Sidebar = create("Frame", {
-		Parent = self.Main,
+		Parent = self.MainFrame,
 		Size = UDim2.new(0, 140, 1, -42),
 		Position = UDim2.new(0, 0, 0, 42),
 		BackgroundColor3 = Color3.fromRGB(18, 18, 18)
@@ -327,7 +336,7 @@ function SawMillHub.new(title, dragSpeed)
 	sideLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 	self.TabHolder = create("Frame", {
-		Parent = self.Main,
+		Parent = self.MainFrame,
 		Size = UDim2.new(1, -140, 1, -42),
 		Position = UDim2.new(0, 140, 0, 42),
 		BackgroundColor3 = Color3.fromRGB(32, 32, 32)
@@ -337,7 +346,7 @@ function SawMillHub.new(title, dragSpeed)
 	-- Inicialização
 	self.Tabs = {}
 	self.Keybinds = {}
-	self.Notifs = {}
+	self.ActiveNotifications = {} -- Corrigido para corresponder a :Notify
 	self.MaxNotifs = 5
 
 	return self
@@ -430,7 +439,7 @@ end
 -- ELEMENTOS
 -----------------------------------------------------
 
--- Label Profissional
+-- Label Profissional (Corrigido para usar :Set)
 function SawMillHub:CreateLabel(tab, text)
 	if not self.Tabs[tab] then return end
 
@@ -457,10 +466,10 @@ function SawMillHub:CreateLabel(tab, text)
 	})
 
 	-- Efeito sutil ao passar o mouse (PC)
-	lbl.MouseEnter:Connect(function()
+	frame.MouseEnter:Connect(function()
 		TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
 	end)
-	lbl.MouseLeave:Connect(function()
+	frame.MouseLeave:Connect(function()
 		TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}):Play()
 	end)
 
@@ -471,13 +480,19 @@ function SawMillHub:CreateLabel(tab, text)
 	-----------------------------------------------------
     local LabelObject = {}
     
-    -- Permite definir um novo texto para o Label
-    function LabelObject:SetText(newText)
-        lbl.Text = tostring(newText or "")
+    -- Permite definir um novo texto para o Label (Ajustado para aceitar tabela ou string, IGNORANDO COR)
+    function LabelObject:Set(data)
+        if type(data) == "table" and data.Content ~= nil then
+            lbl.Text = tostring(data.Content)
+        elseif type(data) == "string" or type(data) == "number" or type(data) == "boolean" then
+            lbl.Text = tostring(data)
+        end
     end
     
-    -- Opcional: retorna o frame principal também
-    LabelObject.Frame = frame
+    -- Permite obter o texto atual
+    function LabelObject:Get()
+        return lbl.Text
+    end
 
 	return setmetatable(LabelObject, {__index = LabelObject})
 end
@@ -910,7 +925,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 	end)
 
 	-- Dispara o estado inicial
-	updateSlider(currentValue, true)
+	updateSlider(currentValue, true, false) -- Passa false para fireCallback
 	self:UpdateScrolling(tab)
     
 	-----------------------------------------------------
@@ -942,7 +957,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	-- Variáveis de Estado
 	local open = false
 	local checkMarks = {} -- Mapeamento: { [OptionName] = CheckMarkInstance }
-	local currentValue = nil
+	local currentValue = options[1] or "Selecione..." -- Padrão: primeiro item ou placeholder
 
 	-- Definição de Cores
 	local neonBlue = NEON_BLUE
@@ -950,11 +965,12 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local selectedBackground = Color3.fromRGB(45, 45, 45)
 	local optionBackground = Color3.fromRGB(35, 35, 35)
 	local optionHover = Color3.fromRGB(50, 50, 50)
+	local HEADER_HEIGHT = 50
 
 	-- CONTAINER PRINCIPAL
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 50),
+		Size = UDim2.new(1, -10, 0, HEADER_HEIGHT), -- Altura inicial do botão
 		BackgroundColor3 = darkBackground,
 		ClipsDescendants = true
 	})
@@ -971,217 +987,219 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	-- BOTÃO PRINCIPAL (HEADER)
 	local btn = create("TextButton", {
 		Parent = frame,
-		Text = "",
-		Size = UDim2.new(1, 0, 0, 50),
+		Text = currentValue,
+		Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
 		BackgroundTransparency = 1,
-		AutoButtonColor = false
-	})
-
-	local btnLabel = create("TextLabel", {
-		Parent = btn,
-		Text = text,
-		Size = UDim2.new(1, -60, 1, 0),
-		Position = UDim2.new(0, 14, 0, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = Color3.fromRGB(220, 220, 220),
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 15, 0, 0)
+	})
+
+	-- Label Título
+	local titleLbl = create("TextLabel", {
+		Parent = btn,
+		Text = text,
+		Size = UDim2.new(0, 100, 0, 20),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 0, -5),
+		BackgroundTransparency = 1,
+		TextColor3 = Color3.fromRGB(150, 150, 150),
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
-	-- SETA MAIOR + ANIMAÇÃO DE ROTAÇÃO
-	local arrow = create("TextLabel", {
+	-- Ícone Seta (Rotacionável)
+	local arrow = create("ImageLabel", {
 		Parent = btn,
-		Text = "▼",
-		Size = UDim2.new(0, 30, 0, 30),
+		Size = UDim2.new(0, 20, 0, 20),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -14, 0.5, 0),
+		Position = UDim2.new(1, -15, 0.5, 0),
 		BackgroundTransparency = 1,
-		TextColor3 = neonBlue,
-		Font = Enum.Font.GothamBlack,
-		TextSize = 25, 
+		Image = "rbxassetid://6034176465", -- Ícone de seta simples
+		ImageColor3 = neonBlue,
 		ZIndex = 2
 	})
 
-	-- Efeito de HOVER no botão principal
-	btn.MouseEnter:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.2), { BackgroundColor3 = selectedBackground }):Play()
-	end)
-	btn.MouseLeave:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.3), { BackgroundColor3 = darkBackground }):Play()
-	end)
-
-
-	-- LISTA DE OPÇÕES
-	local listHeight = #options * 38 + 8 -- Altura de 38 por opção + 8 de padding
-	local list = create("Frame", {
+	-- CONTAINER DE OPÇÕES (Dropdown)
+	local optionsContainer = create("Frame", {
 		Parent = frame,
-		Size = UDim2.new(1, 0, 0, listHeight),
-		Position = UDim2.new(0, 0, 0, 50),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		Visible = false
+		Size = UDim2.new(1, 0, 0, 0), -- Começa com altura zero
+		Position = UDim2.new(0, 0, 0, HEADER_HEIGHT),
+		BackgroundColor3 = optionBackground,
+		ClipsDescendants = true,
+		ZIndex = 1
 	})
-	create("UICorner", { Parent = list, CornerRadius = UDim.new(0, 14) })
-	-- Movemos o stroke para a lista e a deixamos com a cor Neon
-	local listStroke = create("UIStroke", { Parent = list, Color = neonBlue, Thickness = 1.2, Transparency = 1 })
+	local listLayout = create("UIListLayout", {
+		Parent = optionsContainer,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 0)
+	})
+	
+	-- CRIAÇÃO DAS OPÇÕES
+	local OPTION_HEIGHT = 30
+	for i, optionText in ipairs(options) do
+		local optBtn = create("TextButton", {
+			Parent = optionsContainer,
+			Text = optionText,
+			Size = UDim2.new(1, 0, 0, OPTION_HEIGHT),
+			BackgroundColor3 = optionBackground,
+			TextColor3 = Color3.fromRGB(200, 200, 200),
+			Font = Enum.Font.Gotham,
+			TextSize = 15,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.new(0, 15, 0, 0)
+		})
+		
+		-- Checkmark
+		local check = create("ImageLabel", {
+			Parent = optBtn,
+			Size = UDim2.new(0, 20, 0, 20),
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10, 0.5, 0),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://6034176465", -- Exemplo de checkmark (pode ser outro ID)
+			ImageColor3 = neonBlue,
+			Visible = (optionText == currentValue)
+		})
+		checkMarks[optionText] = check
 
-	-- Layout e Padding internos
-	create("UIListLayout", { Parent = list, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
-	create("UIPadding", { Parent = list, PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
-
-
-	-- FUNÇÃO AUXILIAR PARA SELECIONAR UMA OPÇÃO
-	local function selectOption(optionName, skipToggle, fireCallback)
-		if currentValue == optionName then return end -- Evita processamento se já estiver selecionado
-
-		-- 1. Desmarca o ícone anterior
-		if currentValue and checkMarks[currentValue] then
-			checkMarks[currentValue].Visible = false
-		end
-        
-        -- 2. Atualiza o estado e a UI
-        currentValue = optionName
-        
-        if checkMarks[optionName] then
-            checkMarks[optionName].Visible = true
-        end
-
-		btnLabel.Text = text .. ": " .. optionName -- Atualiza o texto do botão principal
-		TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play() -- Destaca o texto selecionado
-		task.delay(0.5, function()
-			TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+		-- Hover
+		optBtn.MouseEnter:Connect(function()
+			TweenService:Create(optBtn, TweenInfo.new(0.15), { BackgroundColor3 = optionHover }):Play()
+		end)
+		optBtn.MouseLeave:Connect(function()
+			-- Se for o item selecionado, volta para a cor de seleção, senão, para o padrão.
+			local targetColor = (currentValue == optionText) and selectedBackground or optionBackground
+			TweenService:Create(optBtn, TweenInfo.new(0.2), { BackgroundColor3 = targetColor }):Play()
+		end)
+		
+		-- Clique
+		optBtn.MouseButton1Click:Connect(function()
+			local newOption = optBtn.Text
+			if currentValue == newOption then
+				-- Se clicar no mesmo item, apenas fecha
+				closeDropdown()
+				return
+			end
+			
+			-- Remove o check do item antigo
+			if checkMarks[currentValue] then
+				checkMarks[currentValue].Visible = false
+			end
+			
+			-- Define o novo valor e o check
+			currentValue = newOption
+			btn.Text = newOption
+			check.Visible = true
+			
+			-- Dispara callback
+			if callback then pcall(callback, currentValue) end
+			
+			closeDropdown()
 		end)
 
-		-- 3. Fecha o dropdown se não for pular
-		if not skipToggle then
-            -- Note: Estamos chamando toggleDropdown (que irá verificar o estado 'open')
-            if open then 
-			    toggleDropdown()
-            end
+		-- Se for o item inicialmente selecionado, ajusta a cor de fundo (opcional)
+		if optionText == currentValue then
+			optBtn.BackgroundColor3 = selectedBackground
 		end
-        
-        -- 4. Dispara o callback
-		if fireCallback ~= false and callback then pcall(callback, optionName) end
 	end
-    
-	-- ABRIR / FECHAR DROPDOWN (Com Animação de Altura)
-	local function toggleDropdown()
-		open = not open
-		list.Visible = true
 
-		-- Animação da Seta
-		TweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-			Rotation = open and 180 or 0
+	local totalHeight = #options * OPTION_HEIGHT
+	
+	-- Funções de Animação
+	local function openDropdown()
+		if open then return end
+		open = true
+
+		-- Expande a altura total do frame
+		TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.new(1, -10, 0, HEADER_HEIGHT + totalHeight)
 		}):Play()
-
-		-- Animação do Stroke da Borda
-		TweenService:Create(mainStroke, TweenInfo.new(0.3), { Transparency = open and 1 or 0.5 }):Play()
-		TweenService:Create(listStroke, TweenInfo.new(0.3), { Transparency = open and 0.5 or 1 }):Play()
-
-		-- Animação do Frame Principal (Tamanho)
-		local goalSize = open and UDim2.new(1, -10, 0, 50 + listHeight) or UDim2.new(1, -10, 0, 50)
-		TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = goalSize}):Play()
-
-		-- Animação de Fade da Lista
-		TweenService:Create(list, TweenInfo.new(0.2), {BackgroundTransparency = open and 0 or 1}):Play()
-
-		if not open then
-			task.delay(0.4, function() -- Atraso maior para coincidir com a animação de tamanho
-				if not open and frame.Size.Y.Offset <= 50 then list.Visible = false end
-			end)
-		end
+		
+		-- Anima a rotação da seta (para baixo)
+		TweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Rotation = 180
+		}):Play()
+		
+		-- Anima o stroke para neon
+		TweenService:Create(mainStroke, TweenInfo.new(0.3), {
+			Color = neonBlue,
+			Thickness = 2
+		}):Play()
+		
+		self:UpdateScrolling(tab)
+	end
+	
+	local function closeDropdown()
+		if not open then return end
+		open = false
+		
+		-- Retrai a altura total do frame
+		TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.new(1, -10, 0, HEADER_HEIGHT)
+		}):Play()
+		
+		-- Anima a rotação da seta (para cima)
+		TweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Rotation = 0
+		}):Play()
+		
+		-- Restaura o stroke
+		TweenService:Create(mainStroke, TweenInfo.new(0.3), {
+			Color = Color3.fromRGB(70, 70, 70),
+			Thickness = 1
+		}):Play()
 
 		self:UpdateScrolling(tab)
 	end
 
-	btn.MouseButton1Click:Connect(toggleDropdown)
+	btn.MouseButton1Click:Connect(function()
+		if open then
+			closeDropdown()
+		else
+			openDropdown()
+		end
+	end)
 
-	-- CRIAR OPÇÕES
-	for i, opt in ipairs(options) do
-		local optBtn = create("TextButton", {
-			Parent = list,
-			Text = "",
-			Size = UDim2.new(1, -10, 0, 34),
-			BackgroundColor3 = optionBackground,
-			AutoButtonColor = false
-		})
-		create("UICorner", { Parent = optBtn, CornerRadius = UDim.new(0, 8) })
-
-		local lbl = create("TextLabel", {
-			Parent = optBtn,
-			Text = opt,
-			Size = UDim2.new(1, -50, 1, 0),
-			Position = UDim2.new(0, 12, 0, 0),
-			BackgroundTransparency = 1,
-			TextColor3 = Color3.fromRGB(230, 230, 230),
-			Font = Enum.Font.Gotham,
-			TextSize = 15,
-			TextXAlignment = Enum.TextXAlignment.Left
-		})
-
-		-- Ícone de Seleção Neon
-		local check = create("TextLabel", {
-			Parent = optBtn,
-			Text = "✓",
-			Size = UDim2.new(0, 24, 0, 24),
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -12, 0.5, 0),
-			BackgroundTransparency = 1,
-			TextColor3 = neonBlue,
-			Font = Enum.Font.GothamBlack,
-			TextSize = 22,
-			Visible = false
-		})
-
-		-- Mapeia a caixa de seleção
-		checkMarks[opt] = check
-        
-        -- Define o valor inicial se for o primeiro item
-        if i == 1 then
-            currentValue = opt
-            check.Visible = true
-        end
-        
-		-- HOVER ANIMADO
-		optBtn.MouseEnter:Connect(function()
-			TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = optionHover}):Play()
-		end)
-		optBtn.MouseLeave:Connect(function()
-			TweenService:Create(optBtn, TweenInfo.new(0.2), {BackgroundColor3 = optionBackground}):Play()
-		end)
-
-		-- SELEÇÃO POR CLIQUE
-		optBtn.MouseButton1Click:Connect(function()
-			selectOption(opt, false, true) -- Não pula o toggle, dispara o callback
-		end)
-	end
-
-	-- Inicializa o texto com o primeiro item ou 'Selecione'
-	if currentValue then
-		btnLabel.Text = text .. ": " .. currentValue
-	else
-		btnLabel.Text = text .. ": (Selecione)"
-	end
-    
-    -- Dispara o callback inicial
-    if currentValue and callback then pcall(callback, currentValue) end
+	-- Se o usuário clicar fora do dropdown, ele fecha
+	UserInputService.InputBegan:Connect(function(input)
+		if open and input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if not input.Target:IsDescendantOf(frame) then
+				closeDropdown()
+			end
+		end
+	end)
 
 	self:UpdateScrolling(tab)
-    
-	-----------------------------------------------------
+
+    -----------------------------------------------------
 	-- SISTEMA SET/GET para Dropdown
 	-----------------------------------------------------
     local DropdownObject = {}
     
-    -- Permite definir o valor do Dropdown programaticamente
-    function DropdownObject:Set(optionName)
-        if checkMarks[optionName] then
-            -- Atualiza a UI e dispara o callback
-            selectOption(optionName, true, true) 
+    -- Permite definir o valor do dropdown programaticamente
+    function DropdownObject:Set(value)
+        local valueStr = tostring(value)
+        if checkMarks[valueStr] then
+            -- Remove o check do item antigo
+            if checkMarks[currentValue] then
+                checkMarks[currentValue].Visible = false
+            end
+            
+            -- Define o novo valor e atualiza a UI
+            currentValue = valueStr
+            btn.Text = valueStr
+            checkMarks[valueStr].Visible = true
+
+            -- Dispara callback se for um valor válido (assumindo que o Set externo não deve disparar callback a menos que seja forçado)
+            if callback then task.spawn(callback, currentValue) end
         end
     end
     
-    -- Permite obter o valor selecionado
+    -- Permite obter o valor atual
     function DropdownObject:Get()
         return currentValue
     end
@@ -1189,167 +1207,15 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	return setmetatable(DropdownObject, {__index = DropdownObject})
 end
 
-function SawMillHub:CreateInput(tab, text, placeholder, callback)
-	if not self.Tabs[tab] then return end
-
-	-- Variável de serviço (necessária para as funções internas)
-	local TweenService = game:GetService("TweenService")
-	
-	-- FRAME PRINCIPAL
-	local frame = create("Frame", {
-		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 55),
-		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
-		ClipsDescendants = true
-	})
-	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 12) })
-	local stroke = create("UIStroke", {
-		Parent = frame,
-		Color = Color3.fromRGB(70, 70, 70),
-		Thickness = 1,
-		Transparency = 0.4
-	})
-
-	-- GLASS SIMULADO + GRADIENT
-	local glass = create("Frame", {
-		Parent = frame,
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundColor3 = Color3.fromRGB(50, 50, 50),
-		BackgroundTransparency = 0.3,
-		ZIndex = 1
-	})
-	create("UICorner", { Parent = glass, CornerRadius = UDim.new(0, 12) })
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 60, 60)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
-	})
-	gradient.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.5),
-		NumberSequenceKeypoint.new(1, 0.7)
-	})
-	gradient.Parent = glass
-
-	-- LABEL FIXO
-	local label = create("TextLabel", {
-		Parent = frame,
-		Text = text or "Input",
-		Size = UDim2.new(1, -12, 0, 18),
-		Position = UDim2.new(0, 8, 0, 6),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(180, 180, 180),
-		Font = Enum.Font.GothamBold,
-		TextSize = 13,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ZIndex = 2
-	})
-
-	-- INPUT BOX
-	local box = create("TextBox", {
-		Parent = frame,
-		Text = "",
-		Size = UDim2.new(1, -16, 0, 22),
-		Position = UDim2.new(0, 8, 0, 28),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(235, 235, 235),
-		Font = Enum.Font.Gotham,
-		TextSize = 15,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ClearTextOnFocus = false,
-		ZIndex = 2
-	})
-
-	-- PLACEHOLDER ANIMADO
-	local placeholderLbl = create("TextLabel", {
-		Parent = box,
-		Text = placeholder or "Digite aqui...",
-		Size = UDim2.new(1, 0, 1, 0),
-		Position = UDim2.new(0, 2, 0, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(120, 120, 120),
-		Font = Enum.Font.Gotham,
-		TextSize = 14,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ZIndex = 3
-	})
-
-	-- FUNÇÃO PARA PLACEHOLDER (corrigida para usar Text)
-	local function updatePlaceholder()
-		if box.Text == "" and not box:IsFocused() then
-			TweenService:Create(placeholderLbl, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
-		else
-			TweenService:Create(placeholderLbl, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
-		end
-	end
-	updatePlaceholder()
-
-	-- FOCO ANIMADO (Glow + Neon)
-	local function focusAnim(focused)
-		if focused then
-			TweenService:Create(stroke, TweenInfo.new(0.25), {
-				Color = Color3.fromRGB(0, 255, 180),
-				Thickness = 2,
-				Transparency = 0
-			}):Play()
-			-- Pulse sutil
-			TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, -1, true), {
-				BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			}):Play()
-		else
-			TweenService:Create(stroke, TweenInfo.new(0.25), {
-				Color = Color3.fromRGB(70, 70, 70),
-				Thickness = 1,
-				Transparency = 0.4
-			}):Play()
-			TweenService:Create(frame, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}):Play()
-		end
-		updatePlaceholder()
-	end
-
-	box.Focused:Connect(function() focusAnim(true) end)
-	box.FocusLost:Connect(function(enter)
-		focusAnim(false)
-		if enter and callback then
-			pcall(callback, box.Text)
-			-- efeito pulse ao confirmar
-			TweenService:Create(frame, TweenInfo.new(0.15), {Size = UDim2.new(1, -10, 0, 57)}):Play()
-			task.delay(0.15, function()
-				TweenService:Create(frame, TweenInfo.new(0.15), {Size = UDim2.new(1, -10, 0, 55)}):Play()
-			end)
-		end
-	end)
-
-	box:GetPropertyChangedSignal("Text"):Connect(updatePlaceholder)
-
-	self:UpdateScrolling(tab)
-    
-	-----------------------------------------------------
-	-- SISTEMA SET/GET para Input
-	-----------------------------------------------------
-    local InputObject = {}
-    
-    -- Permite definir o texto do Input programaticamente
-    function InputObject:Set(newText)
-        box.Text = tostring(newText or "")
-        updatePlaceholder() -- Atualiza o placeholder
-    end
-    
-    -- Permite obter o texto atual
-    function InputObject:Get()
-        return box.Text
-    end
-
-	return setmetatable(InputObject, {__index = InputObject})
-end
------------------------------------------------------
 -- KEYBIND NEON ÉPICO (Animado + Pulse + Glow)
 -----------------------------------------------------
 function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	if not self.Tabs[tab] then return end
     
-    -- Certifica-se de que TweenService está disponível
+    -- Variáveis de Serviço
     local TweenService = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
+    local NEON_BIND = Color3.fromRGB(0, 255, 255)
 
 	-- FRAME
 	local frame = create("Frame", {
@@ -1391,7 +1257,7 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	-- NEON GLOW
 	local btnStroke = create("UIStroke", {
 		Parent = btn,
-		Color = Color3.fromRGB(0, 255, 255),
+		Color = NEON_BIND,
 		Thickness = 2,
 		Transparency = 0.5
 	})
@@ -1399,9 +1265,9 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	local gradient = create("UIGradient", {
 		Parent = btn,
 		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
+			ColorSequenceKeypoint.new(0, NEON_BIND),
 			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 255))
+			ColorSequenceKeypoint.new(1, NEON_BIND)
 		}),
 		Rotation = 45,
 		Transparency = NumberSequence.new(0.5, 0.5)
@@ -1411,7 +1277,7 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	local waiting = false
 
 	-- FUNÇÃO CENTRAL PARA DEFINIR A TECLA
-	local function setKey(newKey)
+	local function setKey(newKey, fireCallback)
 		-- Garante que a nova chave é um Enum.KeyCode
 		if typeof(newKey) == "EnumItem" and newKey.EnumType == Enum.KeyCode then
 			selectedKey = newKey
@@ -1430,18 +1296,19 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
         end
 
 		-- pulse neon
-		TweenService:Create(btnStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {Transparency = 0}):Play()
-		TweenService:Create(btn, TweenInfo.new(0.2), {Size = UDim2.new(0, 135, 0, 33)}):Play()
-		task.delay(0.2, function()
-			TweenService:Create(btn, TweenInfo.new(0.2), {Size = UDim2.new(0, 130, 0, 30)}):Play()
-		end)
-
-		if callback then pcall(callback, selectedKey) end
+		if newKey ~= Enum.KeyCode.Unknown then
+			TweenService:Create(btnStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {Transparency = 0}):Play()
+			TweenService:Create(btn, TweenInfo.new(0.2), {Size = UDim2.new(0, 135, 0, 33)}):Play()
+			task.delay(0.2, function()
+				TweenService:Create(btn, TweenInfo.new(0.2), {Size = UDim2.new(0, 130, 0, 30)}):Play()
+			end)
+		end
+		
+		if fireCallback ~= false and callback then pcall(callback, selectedKey) end
 	end
     
-    -- Chama a função setKey para inicializar corretamente com defaultKey
-    setKey(defaultKey or Enum.KeyCode.Unknown)
-
+    -- Inicializa o valor
+    setKey(defaultKey or Enum.KeyCode.Unknown, false) -- Não dispara o callback na inicialização
 
 	btn.MouseEnter:Connect(function()
 		TweenService:Create(btnStroke, TweenInfo.new(0.3), {Transparency = 0}):Play()
@@ -1465,11 +1332,11 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 		conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
                 -- Define a nova chave e desliga o modo de espera
-				setKey(input.KeyCode) 
+				setKey(input.KeyCode, true) -- Dispara o callback
 				waiting = false
 				conn:Disconnect()
 				-- Restaura o visual
-				TweenService:Create(btnStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(0, 255, 255), Transparency = 0.5}):Play()
+				TweenService:Create(btnStroke, TweenInfo.new(0.2), {Color = NEON_BIND, Transparency = 0.5}):Play()
 				TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35,35,35)}):Play()
 			end
 		end)
@@ -1506,13 +1373,12 @@ function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 
     -- Permite definir a chave programaticamente. Aceita KeyCode ou o nome da chave (string).
     function KeybindObject:Set(newKey) 
-        setKey(newKey)
+        setKey(newKey, false) -- Não dispara callback ao definir
     end
     
 	return setmetatable(KeybindObject, {__index = KeybindObject})
 end
 
------------------------------------------------------
 -- SISTEMA DE NOTIFY (Versão Estável com Animação)
 -----------------------------------------------------
 function SawMillHub:Notify(title, message, duration)
@@ -1536,18 +1402,18 @@ function SawMillHub:Notify(title, message, duration)
 			Name = "NotificationHolder",
 			Size = UDim2.new(0, 320, 1, -20),
 			Position = UDim2.new(1, -330, 1, -10), -- Inferior Direito
-			AnchorPoint = Vector2.new(0, 1), 
+			AnchorPoint = Vector2.new(1, 1),  -- Corrigido para âncora inferior direita
 			BackgroundTransparency = 1,
 			ClipsDescendants = false,
 		})
 		self.NotificationHolder = holder
 
-		-- UIListLayout faz o trabalho de ajuste
+		-- UIListLayout faz o trabalho de ajuste (VerticalAlignment.Bottom para pilha)
 		create("UIListLayout", {
 			Parent = holder,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, 8),
-			VerticalAlignment = Enum.VerticalAlignment.Bottom 
+			VerticalAlignment = Enum.VerticalAlignment.Bottom 
 		})
 	end
 
@@ -1558,7 +1424,7 @@ function SawMillHub:Notify(title, message, duration)
 			-- Animação de saída para BAIXO e para FORA
 			local tweenOut = TweenService:Create(oldest, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 				BackgroundTransparency = 1,
-				Position = oldest.Position + UDim2.new(0, 320, 0, 0) -- Move para a direita (fora da tela)
+				Position = oldest.Position + UDim2.new(0.2, 0, 0, 0) -- Move para a direita (fora da tela)
 			})
 			tweenOut:Play()
 
@@ -1572,7 +1438,7 @@ function SawMillHub:Notify(title, message, duration)
 		Parent = self.NotificationHolder,
 		Size = UDim2.new(1, 0, 0, 70),
 		BackgroundColor3 = BASE_BG,
-		BackgroundTransparency = 1, 
+		BackgroundTransparency = 1, 
 		ClipsDescendants = true,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = #self.ActiveNotifications + 1 -- Garante que o novo vá para o final da lista (base)
@@ -1580,10 +1446,10 @@ function SawMillHub:Notify(title, message, duration)
 
 	create("UICorner", {Parent = notif, CornerRadius = UDim.new(0, 12)})
 	create("UIStroke", {
-		Parent = notif, 
-		Color = NEON_BLUE, 
+		Parent = notif, 
+		Color = NEON_BLUE, 
 		Thickness = 1.5,
-		Transparency = 0.6 
+		Transparency = 0.6 
 	})
 	create("UIPadding", {
 		Parent = notif,
@@ -1608,7 +1474,7 @@ function SawMillHub:Notify(title, message, duration)
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
-		TextColor3 = NEON_BLUE, 
+		TextColor3 = NEON_BLUE, 
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextWrapped = true
 	})
@@ -1634,7 +1500,8 @@ function SawMillHub:Notify(title, message, duration)
 	create("UICorner", {Parent = bar, CornerRadius = UDim.new(0, 3)})
 
 	-- 4. Entrada Animada
-	notif.Position = UDim2.new(0, 320, 0, 0) -- Começa fora (direita)
+	-- Começa fora (direita) para deslizar para dentro
+	notif.Position = UDim2.new(0, 320, 0, 0) 
 
 	-- Animação Slide-In elegante e fade do background
 	TweenService:Create(notif, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -1655,7 +1522,7 @@ function SawMillHub:Notify(title, message, duration)
 		if notif and notif.Parent then
 			-- Animação de saída
 			local tweenOut = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-				Position = notif.Position + UDim2.new(0, 320, 0, 0), -- Desliza para fora (direita)
+				Position = notif.Position + UDim2.new(0.2, 0, 0, 0), -- Desliza para fora (direita)
 				BackgroundTransparency = 1
 			})
 			tweenOut:Play()
@@ -1677,4 +1544,5 @@ function SawMillHub:Notify(title, message, duration)
 		end
 	end)
 end
+
 return SawMillHub
