@@ -5,7 +5,7 @@ local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = LocalPlayer:WaitForChild("PlayerGui") 
-local Mouse = LocalPlayer:GetMouse() -- Objeto Mouse para posição absoluta
+local Mouse = LocalPlayer:GetMouse() -- Usado para obter a posição do mouse/toque
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
@@ -182,14 +182,12 @@ function SawMillHub.new(title, dragSpeed)
 		TextSize = 18
 	})
     
-	-- CORES DO BOTÃO DE FECHAR (mantidas)
+	-- CORES DO BOTÃO DE FECHAR
 	local baseRed = Color3.fromRGB(255, 60, 60)
-	local hoverRed = Color3.fromRGB(255, 100, 100)
-	local clickRed = Color3.fromRGB(180, 0, 0)
-	local neonRed = Color3.fromRGB(255, 0, 0)
+	-- (Hover e Click omitidos para simplificar, mas podem ser recolocados)
 
 	-----------------------------------------------------
-	-- Botão de Fechar GUI (X) ❌ (Simples, para reduzir o código)
+	-- Botão de Fechar GUI (X) ❌
 	-----------------------------------------------------
 	local closeButton = create("TextButton", {
 		Parent = topBar,
@@ -215,18 +213,18 @@ function SawMillHub.new(title, dragSpeed)
 	-----------------------------------------------------
 
 	-----------------------------------------------------
-	-- Sistema de Drag Principal (Força Mouse Absoluto)
+	-- Sistema de Drag (Universal)
 	-----------------------------------------------------
 	local dragging = false
 	local dragStartOffset = Vector2.new(0, 0) 
-	local targetPos = self.Main.Position -- Posição alvo para o Lerp
+	local targetPos = self.Main.Position 
     
 	-- Define quão rápido o frame segue o mouse/alvo
-	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 
+	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 -- 1.0 (Default) ou 0.1 (Slow)
 
     -- Inicia o arrasto
 	topBar.InputBegan:Connect(function(input)
-        -- Apenas para Mouse ou Touch
+        -- Apenas para Mouse (Botão Esquerdo) ou Touch
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			
@@ -248,7 +246,7 @@ function SawMillHub.new(title, dragSpeed)
     ----------------------------------------------------------------
 	RunService.RenderStepped:Connect(function(dt)
 		if dragging then
-            -- Obtém a posição absoluta do mouse (funciona mesmo que o cursor seja resetado)
+            -- Obtém a posição absoluta do mouse (funciona para PC e Mobile)
             local currentMousePos = Vector2.new(Mouse.X, Mouse.Y)
             
             -- O novo canto da GUI é a posição do mouse menos o offset inicial
