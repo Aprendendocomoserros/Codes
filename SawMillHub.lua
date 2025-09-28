@@ -10,6 +10,15 @@ local SawMillHub = {}
 SawMillHub.__index = SawMillHub
 
 -----------------------------------------------------
+-- CONSTANTES DE COR ESSENCIAIS PARA O SISTEMA
+-----------------------------------------------------
+local NEON_COLOR = Color3.fromRGB(0, 170, 255)
+local TEXT_COLOR = Color3.fromRGB(235, 235, 235)
+local BG_COLOR = Color3.fromRGB(35, 35, 35)
+local BORDER_COLOR = Color3.fromRGB(70, 70, 70)
+
+
+-----------------------------------------------------
 -- Criador seguro de Instâncias
 -----------------------------------------------------
 local function create(class, props)
@@ -342,7 +351,6 @@ function SawMillHub.new(title, dragSpeed)
 
 	return self
 end
-
 -----------------------------------------------------
 -- Criar Tab com scroll automático e hover suave
 -----------------------------------------------------
