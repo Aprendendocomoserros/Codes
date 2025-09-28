@@ -1,10 +1,9 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local CoreGui = LocalPlayer:WaitForChild("PlayerGui") 
+local CoreGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
@@ -23,54 +22,73 @@ local function create(class, props)
 end
 
 -----------------------------------------------------
--- Função Close
+-- Sistema Draggable
 -----------------------------------------------------
-function SawMillHub:Close(skipOnCloseEvent)
-	-- Checagem inicial de segurança
-	if not self.Gui or not self.Gui.Parent or not self.Main then return end
+local function enableDragging(frame, dragSpeed)
+	local dragging = false
+	local dragStart, startPos
 
-	-- Evita fechar duas vezes
-	if self._IsClosing then return end
-	self._IsClosing = true
-
-	-- Dispara o evento de fechamento
-	if not skipOnCloseEvent and self._Closer then
-		pcall(function()
-			self._Closer:Fire("Closed")
-		end)
+	-- Velocidade de arrasto
+	local speed = 1
+	if dragSpeed == "Slow" then
+		speed = 0.2
+	elseif dragSpeed == "Default" then
+		speed = 1
 	end
 
-	-- Detecta destruição externa
-	self.Gui.AncestryChanged:Connect(function(_, parent)
-		if not parent and self._Closer then
-			pcall(function()
-				self._Closer:Fire("Destroyed")
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
 			end)
 		end
 	end)
 
-	-- Detecta reabertura/reexecução
-	if self._AlreadyOpened then
-		if self._Closer then
-			pcall(function()
-				self._Closer:Fire("Reopened")
-			end)
-		end
-	end
-	self._AlreadyOpened = true
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 
-	-- Animação de Fechamento
+			if speed < 1 then
+				TweenService:Create(frame, TweenInfo.new(speed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Position = newPos
+				}):Play()
+			else
+				frame.Position = newPos
+			end
+		end
+	end)
+end
+
+-----------------------------------------------------
+-- Fecha a GUI
+-----------------------------------------------------
+function SawMillHub:Close()
+	if not self.Gui or not self.Gui.Parent or not self.Main then return end
+	if self._IsClosing then return end
+	self._IsClosing = true
+
+	-- Dispara o evento OnClose
+	if self.OnClose then
+		pcall(function()
+			self.OnClose:Fire()
+		end)
+	end
+
+	-- Animação suave de fechamento
 	local currentSize = self.Main.Size
 	local currentPos = self.Main.Position
-
-	local targetXOffset = currentPos.X.Offset + currentSize.X.Offset * 0.05
-	local targetYOffset = currentPos.Y.Offset + currentSize.Y.Offset * 0.05
 
 	TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 		Size = UDim2.new(currentSize.X.Scale, currentSize.X.Offset * 0.9,
 			currentSize.Y.Scale, currentSize.Y.Offset * 0.9),
-		Position = UDim2.new(currentPos.X.Scale, targetXOffset,
-			currentPos.Y.Scale, targetYOffset),
+		Position = UDim2.new(currentPos.X.Scale, currentPos.X.Offset + currentSize.X.Offset * 0.05,
+			currentPos.Y.Scale, currentPos.Y.Offset + currentSize.Y.Offset * 0.05),
 		BackgroundTransparency = 1
 	}):Play()
 
@@ -78,37 +96,32 @@ function SawMillHub:Close(skipOnCloseEvent)
 	for _, child in ipairs(self.Main:GetDescendants()) do
 		if child:IsA("GuiObject") then
 			local properties = {}
-
 			if typeof(child.BackgroundTransparency) == "number" then
 				properties.BackgroundTransparency = 1
 			end
-
 			if (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox"))
 				and typeof(child.TextTransparency) == "number" then
 				properties.TextTransparency = 1
 			end
-
 			if (child:IsA("ImageLabel") or child:IsA("ImageButton"))
 				and typeof(child.ImageTransparency) == "number" then
 				properties.ImageTransparency = 1
 			end
-
 			if child:IsA("UIStroke") and typeof(child.Transparency) == "number" then
 				properties.Transparency = 1
 			end
-
 			if next(properties) then
 				TweenService:Create(child, TweenInfo.new(0.25), properties):Play()
 			end
 		end
 	end
 
-	-- Destrói a GUI após animação
+	-- Destroi a GUI após a animação
 	task.delay(0.35, function()
 		if self.Gui and self.Gui.Parent then
 			self.Gui:Destroy()
-			self._IsClosing = false
 		end
+		self._IsClosing = false
 	end)
 end
 
@@ -118,7 +131,7 @@ end
 function SawMillHub.new(title, dragSpeed)
 	dragSpeed = dragSpeed or "Default"
 
-	-- Fecha GUI antiga antes de criar uma nova
+	-- Fecha GUI antiga antes de criar nova
 	local oldGui = CoreGui:FindFirstChild("SawMillHub")
 	if oldGui then
 		local oldHubRef = oldGui:FindFirstChild("SawMillHubObject")
@@ -136,28 +149,20 @@ function SawMillHub.new(title, dragSpeed)
 		end
 	end
 
-	-- Cria nova instância
+	-- Nova instância
 	local self = setmetatable({}, SawMillHub)
-	local isTouch = UserInputService.TouchEnabled
 
-	-- CRIA O BindableEvent _Closer
-	self._Closer = Instance.new("BindableEvent")
+	-- Evento público OnClose
+	self.OnClose = Instance.new("BindableEvent")
 
-	-- Controle interno
-	self._IsClosing = false
-	self._AlreadyOpened = false
-
-	-- Propriedade OnClose (para compatibilidade externa)
-	self.OnClose = self._Closer.Event
-
-	-- GUI principal
+	-- Cria GUI principal
 	self.Gui = create("ScreenGui", {
 		Parent = CoreGui,
 		ResetOnSpawn = false,
 		Name = "SawMillHub"
 	})
 
-	-- Referência do Hub na GUI
+	-- Referência do Hub dentro da GUI
 	create("ObjectValue", {
 		Parent = self.Gui,
 		Name = "SawMillHubObject",
@@ -165,7 +170,17 @@ function SawMillHub.new(title, dragSpeed)
 		Archivable = false
 	})
 
-	-- Tamanho e posição
+	-- Detecta destruição externa
+	self.Gui.AncestryChanged:Connect(function(_, parent)
+		if not parent and self.OnClose then
+			pcall(function()
+				self.OnClose:Fire()
+			end)
+		end
+	end)
+
+	-- Layout principal
+	local isTouch = UserInputService.TouchEnabled
 	local mainSize = isTouch and UDim2.new(0, 380, 0, 300) or UDim2.new(0, 560, 0, 400)
 	local mainPos = UDim2.new(0.5, -(mainSize.X.Offset / 2), 0.5, -(mainSize.Y.Offset / 2))
 
@@ -178,6 +193,9 @@ function SawMillHub.new(title, dragSpeed)
 	})
 	create("UICorner", { Parent = self.Main, CornerRadius = UDim.new(0, 12) })
 	create("UIStroke", { Parent = self.Main, Color = Color3.fromRGB(70, 70, 70), Thickness = 1.5 })
+
+	-- Habilita Dragging no Main pelo TopBar
+	enableDragging(self.Main, dragSpeed)
 
 	-----------------------------------------------------
 	-- Barra Superior
@@ -225,7 +243,7 @@ function SawMillHub.new(title, dragSpeed)
 	end)
 
 	-----------------------------------------------------
-	-- Inicialização
+	-- Layout base
 	-----------------------------------------------------
 	self.Sidebar = create("Frame", {
 		Parent = self.Main,
