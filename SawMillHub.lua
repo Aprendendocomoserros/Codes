@@ -22,43 +22,109 @@ local function create(class, props)
 	return inst
 end
 
--- =================================================================
--- Funções do Módulo (Omitidas para brevidade - Exemplo)
--- Você precisa manter estas funções vazias ou completas no módulo real.
--- =================================================================
+-----------------------------------------------------
+-- Função Close
+-----------------------------------------------------
 function SawMillHub:Close(skipOnCloseEvent)
-    -- Lógica de fechamento, omissão para o foco na pergunta.
-end
+	-- Checagem inicial de segurança
+	if not self.Gui or not self.Gui.Parent or not self.Main then return end
 
-function SawMillHub:CreateTab(name)
-    -- Lógica de criação de abas, omissão.
-end
+	-- Evita fechar duas vezes
+	if self._IsClosing then return end
+	self._IsClosing = true
 
-function SawMillHub:CreateToggle(tabName, text, default, callback)
-    -- Lógica de criação de toggles, omissão.
-end
+	-- Dispara o evento de fechamento
+	if not skipOnCloseEvent and self._Closer then
+		pcall(function()
+			self._Closer:Fire("Closed")
+		end)
+	end
 
-function SawMillHub:Notify(title, message, duration)
-    -- Lógica de notificação, omissão.
+	-- Detecta destruição externa
+	self.Gui.AncestryChanged:Connect(function(_, parent)
+		if not parent and self._Closer then
+			pcall(function()
+				self._Closer:Fire("Destroyed")
+			end)
+		end
+	end)
+
+	-- Detecta reabertura/reexecução
+	if self._AlreadyOpened then
+		if self._Closer then
+			pcall(function()
+				self._Closer:Fire("Reopened")
+			end)
+		end
+	end
+	self._AlreadyOpened = true
+
+	-- Animação de Fechamento
+	local currentSize = self.Main.Size
+	local currentPos = self.Main.Position
+
+	local targetXOffset = currentPos.X.Offset + currentSize.X.Offset * 0.05
+	local targetYOffset = currentPos.Y.Offset + currentSize.Y.Offset * 0.05
+
+	TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = UDim2.new(currentSize.X.Scale, currentSize.X.Offset * 0.9,
+			currentSize.Y.Scale, currentSize.Y.Offset * 0.9),
+		Position = UDim2.new(currentPos.X.Scale, targetXOffset,
+			currentPos.Y.Scale, targetYOffset),
+		BackgroundTransparency = 1
+	}):Play()
+
+	-- Fade out dos elementos internos
+	for _, child in ipairs(self.Main:GetDescendants()) do
+		if child:IsA("GuiObject") then
+			local properties = {}
+
+			if typeof(child.BackgroundTransparency) == "number" then
+				properties.BackgroundTransparency = 1
+			end
+
+			if (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox"))
+				and typeof(child.TextTransparency) == "number" then
+				properties.TextTransparency = 1
+			end
+
+			if (child:IsA("ImageLabel") or child:IsA("ImageButton"))
+				and typeof(child.ImageTransparency) == "number" then
+				properties.ImageTransparency = 1
+			end
+
+			if child:IsA("UIStroke") and typeof(child.Transparency) == "number" then
+				properties.Transparency = 1
+			end
+
+			if next(properties) then
+				TweenService:Create(child, TweenInfo.new(0.25), properties):Play()
+			end
+		end
+	end
+
+	-- Destrói a GUI após animação
+	task.delay(0.35, function()
+		if self.Gui and self.Gui.Parent then
+			self.Gui:Destroy()
+			self._IsClosing = false
+		end
+	end)
 end
 
 -----------------------------------------------------
 -- Construtor Principal
 -----------------------------------------------------
 function SawMillHub.new(title, dragSpeed)
-	-- dragSpeed: "Default" ou "Slow"
 	dragSpeed = dragSpeed or "Default"
 
-	-- -----------------------------------------------------
-	-- Fechamento da GUI Antiga (com OnClose)
-	-- -----------------------------------------------------
+	-- Fecha GUI antiga antes de criar uma nova
 	local oldGui = CoreGui:FindFirstChild("SawMillHub")
 	if oldGui then
-		local oldHub = oldGui:FindFirstChild("SawMillHubObject")
-		if oldHub and oldHub.Value then
-			local oldHubInstance = oldHub.Value
+		local oldHubRef = oldGui:FindFirstChild("SawMillHubObject")
+		if oldHubRef and oldHubRef.Value then
+			local oldHubInstance = oldHubRef.Value
 			if oldHubInstance and oldHubInstance.Close then
-				-- Chama o Close() da instância antiga, disparando o OnClose dela.
 				task.spawn(function()
 					oldHubInstance:Close()
 				end)
@@ -69,43 +135,44 @@ function SawMillHub.new(title, dragSpeed)
 			pcall(function() oldGui:Destroy() end)
 		end
 	end
-	-- -----------------------------------------------------
 
+	-- Cria nova instância
 	local self = setmetatable({}, SawMillHub)
 	local isTouch = UserInputService.TouchEnabled
 
-	-- Propriedade OnClose
-	self.OnClose = nil
+	-- CRIA O BindableEvent _Closer
+	self._Closer = Instance.new("BindableEvent")
 
-	-- === PROPRIEDADES DE SOBREPOSIÇÃO APLICADAS AQUI ===
+	-- Controle interno
+	self._IsClosing = false
+	self._AlreadyOpened = false
+
+	-- Propriedade OnClose (para compatibilidade externa)
+	self.OnClose = self._Closer.Event
+
+	-- GUI principal
 	self.Gui = create("ScreenGui", {
 		Parent = CoreGui,
 		ResetOnSpawn = false,
-		Name = "SawMillHub",
-		-- 💡 1. ZIndexBehavior Global: Garante que a GUI fique POR CIMA do CoreGui.
-		ZIndexBehavior = Enum.ZIndexBehavior.Global, 
-		-- 💡 2. IgnoreGuiInset: Permite que a GUI cubra a barra superior do Roblox.
-		IgnoreGuiInset = true 
+		Name = "SawMillHub"
 	})
 
-	-- Armazena a referência do objeto Hub na ScreenGui para acesso posterior
-	local hubRef = create("ObjectValue", {
+	-- Referência do Hub na GUI
+	create("ObjectValue", {
 		Parent = self.Gui,
 		Name = "SawMillHubObject",
 		Value = self,
 		Archivable = false
 	})
 
-
+	-- Tamanho e posição
 	local mainSize = isTouch and UDim2.new(0, 380, 0, 300) or UDim2.new(0, 560, 0, 400)
-	local mainPos = UDim2.new(0.5, -(mainSize.X.Offset/2), 0.5, -(mainSize.Y.Offset/2))
+	local mainPos = UDim2.new(0.5, -(mainSize.X.Offset / 2), 0.5, -(mainSize.Y.Offset / 2))
 
-	-- Janela Principal
 	self.Main = create("Frame", {
 		Parent = self.Gui,
 		Size = mainSize,
 		Position = mainPos,
-        ZIndex = 2, -- ZIndex alto garante visibilidade máxima
 		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
 		ClipsDescendants = true
 	})
@@ -118,12 +185,10 @@ function SawMillHub.new(title, dragSpeed)
 	local topBar = create("Frame", {
 		Parent = self.Main,
 		Size = UDim2.new(1, 0, 0, 42),
-		Position = UDim2.new(0, 0, 0, 0),
 		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
 		Name = "TopBar"
 	})
 	create("UICorner", { Parent = topBar, CornerRadius = UDim.new(0, 12) })
-	create("UIStroke", { Parent = topBar, Color = Color3.fromRGB(50, 50, 50), Thickness = 1 })
 
 	create("TextLabel", {
 		Parent = topBar,
@@ -137,14 +202,8 @@ function SawMillHub.new(title, dragSpeed)
 		TextSize = 18
 	})
 
-	-- CORES DO BOTÃO DE FECHAR
-	local baseRed = Color3.fromRGB(255, 60, 60)
-	local hoverRed = Color3.fromRGB(255, 100, 100)
-	local clickRed = Color3.fromRGB(180, 0, 0)
-	local neonRed = Color3.fromRGB(255, 0, 0)
-
 	-----------------------------------------------------
-	-- Botão de Fechar GUI (X) ❌ (Animado)
+	-- Botão de fechar ❌
 	-----------------------------------------------------
 	local closeButton = create("TextButton", {
 		Parent = topBar,
@@ -152,7 +211,7 @@ function SawMillHub.new(title, dragSpeed)
 		Size = UDim2.new(0, 32, 0, 32),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -6, 0.5, 0),
-		BackgroundColor3 = baseRed,
+		BackgroundColor3 = Color3.fromRGB(255, 60, 60),
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		Font = Enum.Font.GothamBold,
 		TextSize = 20,
@@ -161,122 +220,12 @@ function SawMillHub.new(title, dragSpeed)
 	})
 	create("UICorner", { Parent = closeButton, CornerRadius = UDim.new(0, 8) })
 
-	-- Efeito de Neon Glow
-	local glowStroke = create("UIStroke", {
-		Parent = closeButton,
-		Color = neonRed,
-		Thickness = 2,
-		Transparency = 1, -- Começa invisível
-		LineJoinMode = Enum.LineJoinMode.Round
-	})
-
-	-- Sombra sutil
-	local shadow = create("ImageLabel", {
-		Parent = closeButton,
-		Size = UDim2.new(1, 4, 1, 4),
-		Position = UDim2.new(0, -2, 0, -2),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://1316045217", 
-		ImageColor3 = Color3.new(0, 0, 0),
-		ImageTransparency = 0.6,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(10, 10, 118, 118),
-		ZIndex = 0
-	})
-
-	closeButton:SetAttribute("MouseIsOver", false)
-
-	-- Efeitos de Hover
-	closeButton.MouseEnter:Connect(function()
-		closeButton:SetAttribute("MouseIsOver", true)
-		TweenService:Create(closeButton, TweenInfo.new(0.2), { BackgroundColor3 = hoverRed }):Play()
-		TweenService:Create(glowStroke, TweenInfo.new(0.2), { Transparency = 0.5 }):Play()
-	end)
-
-	closeButton.MouseLeave:Connect(function()
-		closeButton:SetAttribute("MouseIsOver", false)
-		TweenService:Create(closeButton, TweenInfo.new(0.3), { BackgroundColor3 = baseRed }):Play()
-		TweenService:Create(glowStroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
-	end)
-
-	-- Efeito de Click
-	closeButton.MouseButton1Down:Connect(function()
-		-- Animação de cor
-		TweenService:Create(closeButton, TweenInfo.new(0.05), { BackgroundColor3 = clickRed }):Play()
-		-- Animação de tamanho (diminui)
-		TweenService:Create(closeButton, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Size = UDim2.new(0, 30, 0, 30) }):Play()
-	end)
-
-	closeButton.MouseButton1Up:Connect(function()
-		-- Animação de tamanho (volta ao normal)
-		TweenService:Create(closeButton, TweenInfo.new(0.2, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), { Size = UDim2.new(0, 32, 0, 32) }):Play()
-
-		-- Lógica para retornar à cor correta (Hover ou Base)
-		if closeButton:GetAttribute("MouseIsOver") then
-			TweenService:Create(closeButton, TweenInfo.new(0.1), { BackgroundColor3 = hoverRed }):Play()
-		else
-			TweenService:Create(closeButton, TweenInfo.new(0.1), { BackgroundColor3 = baseRed }):Play()
-		end
-	end)
-
-	-- Lógica para fechar
 	closeButton.MouseButton1Click:Connect(function()
 		self:Close()
 	end)
-	-----------------------------------------------------
-	-- Fim Botão de Fechar
-	-----------------------------------------------------
 
 	-----------------------------------------------------
-	-- Sistema de Drag com efeito “Lag”
-	-----------------------------------------------------
-	local dragging = false
-	local dragInput, dragStart, startPos
-	local targetPos = self.Main.Position
-
-	-- Define quão rápido o frame segue o mouse
-	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 -- Slow = devagar, Default = instantâneo
-
-	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = self.Main.Position
-			dragInput = input
-		end
-	end)
-
-	topBar.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			local delta = input.Position - dragStart
-			targetPos = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + delta.X,
-				startPos.Y.Scale, startPos.Y.Offset + delta.Y
-			)
-		end
-	end)
-
-	-- RenderLoop para animação suave
-	RunService.RenderStepped:Connect(function(dt)
-		if dragging or (self.Main.Position ~= targetPos) then
-			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
-		end
-	end)
-
-	topBar.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
-
-	-----------------------------------------------------
-	-- Sidebar + TabHolder
+	-- Inicialização
 	-----------------------------------------------------
 	self.Sidebar = create("Frame", {
 		Parent = self.Main,
@@ -285,8 +234,6 @@ function SawMillHub.new(title, dragSpeed)
 		BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 	})
 	create("UICorner", { Parent = self.Sidebar, CornerRadius = UDim.new(0, 8) })
-	local sideLayout = create("UIListLayout", { Parent = self.Sidebar, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) })
-	sideLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 	self.TabHolder = create("Frame", {
 		Parent = self.Main,
@@ -296,7 +243,6 @@ function SawMillHub.new(title, dragSpeed)
 	})
 	create("UICorner", { Parent = self.TabHolder, CornerRadius = UDim.new(0, 8) })
 
-	-- Inicialização
 	self.Tabs = {}
 	self.Keybinds = {}
 	self.Notifs = {}
@@ -388,41 +334,50 @@ function SawMillHub:UpdateScrolling(tabName)
 	tab.Container.CanvasSize = UDim2.new(0, 0, 0, total + 10)
 end
 
------------------------------------------------------
--- Label (Corrigido para aceitar {Content, Color})
+-- Label (Simplificado: Removido 'initialContent')
 -----------------------------------------------------
 
--- Alteração: Adicionado 'initialContent' como terceiro parâmetro
-function SawMillHub:CreateLabel(tab, text, initialContent)
-	if not self.Tabs[tab] then return end
+-- Assumimos que 'create', UDim2, Color3, Enum, TweenService, e self.Tabs/UpdateScrolling 
+-- estão definidos no escopo do script.
 
+function SawMillHub:CreateLabel(tab, text) -- APENAS 'tab' E 'text'
+	-- Variável local TEXT_COLOR (Defina-a como a cor padrão desejada)
+	local TEXT_COLOR = Color3.new(0, 0.133333, 1) -- Exemplo de cor azul
+
+	-- 1. Check if the specified tab exists
+	if not self.Tabs or not self.Tabs[tab] then
+		warn("SawMillHub:CreateLabel called for a non-existent tab:", tab)
+		return nil
+	end
+
+	-- 2. Define the main frame container
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
 		Size = UDim2.new(1, -10, 0, 40),
 		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
 		BorderSizePixel = 0,
 	})
+
+	-- 3. Add cosmetic elements to the frame
 	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 10) })
 	create("UIStroke", { Parent = frame, Color = Color3.fromRGB(60, 60, 60), Thickness = 1 })
 
+	-- 4. Create the TextLabel inside the frame
 	local lbl = create("TextLabel", {
 		Parent = frame,
-		-- Define o texto inicial
-		Text = tostring(text or "") .. ": " .. tostring(initialContent or "N/A"), 
+		-- DEFINE O TEXTO INICIAL: Usa apenas 'text', ou string vazia se for nil.
+		Text = tostring(text or ""), 
 		Size = UDim2.new(1, -20, 1, 0),
 		Position = UDim2.new(0, 10, 0, 0),
 		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(220, 220, 220), -- Cor padrão para o texto
+		TextColor3 = TEXT_COLOR,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
 		TextWrapped = true
 	})
-	
-	-- Captura o nome da propriedade para uso no Set()
-	local propertyName = tostring(text or "Propriedade")
 
-	-- Efeito sutil ao passar o mouse (PC)
+	-- 5. Add subtle mouse hover effects
 	lbl.MouseEnter:Connect(function()
 		TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
 	end)
@@ -430,30 +385,37 @@ function SawMillHub:CreateLabel(tab, text, initialContent)
 		TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}):Play()
 	end)
 
+	-- 6. Update the scrolling frame size
 	self:UpdateScrolling(tab)
 
-	-- Retornar objeto com função Set
+	-- 7. Define the returned object and its Set method
 	local labelObject = {}
 
-	-- CORREÇÃO AQUI: Agora aceita uma table {Content=string, Color=Color3}
+	-- **MÉTODO SET**
+	-- Define o texto inteiro do label, substituindo o anterior.
 	function labelObject:Set(data)
-        -- Assume que 'data' é uma table, mas aceita string para compatibilidade simples
-        local newContent = type(data) == "table" and tostring(data.Content or "N/A") or tostring(data or "N/A")
-        local newColor = type(data) == "table" and data.Color
-        
-        -- Atualiza o texto: "Propriedade: Conteúdo Novo"
-        lbl.Text = propertyName .. ": " .. newContent
-        
-        -- Se uma cor for fornecida, ela é aplicada
-        if newColor and newColor:IsA("Color3") then
-            lbl.TextColor3 = newColor
-        else
-            -- Se não houver cor, volta para o padrão (ou mantém a anterior se for nil)
-            lbl.TextColor3 = TEXT_COLOR -- TEXT_COLOR é a constante que você definiu
-        end
+		local newContent
+		local newColor
+
+		-- Verifica se 'data' é uma tabela para {Content = valor, Color = cor}
+		if type(data) == "table" then
+			newContent = tostring(data.Content or "")
+			newColor = data.Color
+		else
+			-- Se 'data' é um valor simples
+			newContent = tostring(data or "")
+		end
+
+		-- ATUALIZA O TEXTO: O novo conteúdo substitui COMPLETAMENTE o texto.
+		lbl.Text = newContent
+
+		-- Se uma Color3 for fornecida, ela é aplicada
+		if newColor and typeof(newColor) == "Color3" then
+			lbl.TextColor3 = newColor
+		end
 	end
 
-	-- Caso você queira acessar o próprio frame
+	-- 8. Expose the created UI elements
 	labelObject.Frame = frame
 	labelObject.Label = lbl
 
