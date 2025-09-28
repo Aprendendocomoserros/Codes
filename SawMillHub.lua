@@ -435,10 +435,11 @@ function SawMillHub:UpdateScrolling(tabName)
 end
 
 -----------------------------------------------------
--- ELEMENTOS
+-- Label (Corrigido para aceitar {Content, Color})
 -----------------------------------------------------
 
-function SawMillHub:CreateLabel(tab, text)
+-- Alteração: Adicionado 'initialContent' como terceiro parâmetro
+function SawMillHub:CreateLabel(tab, text, initialContent)
 	if not self.Tabs[tab] then return end
 
 	local frame = create("Frame", {
@@ -452,16 +453,20 @@ function SawMillHub:CreateLabel(tab, text)
 
 	local lbl = create("TextLabel", {
 		Parent = frame,
-		Text = tostring(text or ""),
+		-- Define o texto inicial
+		Text = tostring(text or "") .. ": " .. tostring(initialContent or "N/A"), 
 		Size = UDim2.new(1, -20, 1, 0),
 		Position = UDim2.new(0, 10, 0, 0),
 		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(220, 220, 220),
+		TextColor3 = Color3.fromRGB(220, 220, 220), -- Cor padrão para o texto
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
 		TextWrapped = true
 	})
+	
+	-- Captura o nome da propriedade para uso no Set()
+	local propertyName = tostring(text or "Propriedade")
 
 	-- Efeito sutil ao passar o mouse (PC)
 	lbl.MouseEnter:Connect(function()
@@ -476,8 +481,22 @@ function SawMillHub:CreateLabel(tab, text)
 	-- Retornar objeto com função Set
 	local labelObject = {}
 
-	function labelObject:Set(newText)
-		lbl.Text = tostring(newText or "")
+	-- CORREÇÃO AQUI: Agora aceita uma table {Content=string, Color=Color3}
+	function labelObject:Set(data)
+        -- Assume que 'data' é uma table, mas aceita string para compatibilidade simples
+        local newContent = type(data) == "table" and tostring(data.Content or "N/A") or tostring(data or "N/A")
+        local newColor = type(data) == "table" and data.Color
+        
+        -- Atualiza o texto: "Propriedade: Conteúdo Novo"
+        lbl.Text = propertyName .. ": " .. newContent
+        
+        -- Se uma cor for fornecida, ela é aplicada
+        if newColor and newColor:IsA("Color3") then
+            lbl.TextColor3 = newColor
+        else
+            -- Se não houver cor, volta para o padrão (ou mantém a anterior se for nil)
+            lbl.TextColor3 = TEXT_COLOR -- TEXT_COLOR é a constante que você definiu
+        end
 	end
 
 	-- Caso você queira acessar o próprio frame
