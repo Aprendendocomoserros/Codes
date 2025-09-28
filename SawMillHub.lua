@@ -4,7 +4,7 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui") 
+local CoreGui = LocalPlayer:WaitForChild("PlayerGui") 
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
@@ -430,7 +430,6 @@ end
 -- ELEMENTOS
 -----------------------------------------------------
 
--- Label Profissional
 function SawMillHub:CreateLabel(tab, text)
 	if not self.Tabs[tab] then return end
 
@@ -465,18 +464,32 @@ function SawMillHub:CreateLabel(tab, text)
 	end)
 
 	self:UpdateScrolling(tab)
-	return frame
+
+	-- Retornar objeto com função Set
+	local labelObject = {}
+
+	function labelObject:Set(newText)
+		lbl.Text = tostring(newText or "")
+	end
+
+	-- Caso você queira acessar o próprio frame
+	labelObject.Frame = frame
+	labelObject.Label = lbl
+
+	return labelObject
 end
 
 -----------------------------------------------------
--- Botão Profissional Moderno
+-- Botão Profissional Moderno (Corrigido com :Set)
 -----------------------------------------------------
 function SawMillHub:CreateButton(tab, text, callback)
 	if not self.Tabs[tab] then return end
 
+	local initialText = tostring(text or "")
+
 	local btn = create("TextButton", {
 		Parent = self.Tabs[tab].Container,
-		Text = tostring(text or ""),
+		Text = initialText,
 		Size = UDim2.new(1, -10, 0, 42),
 		BackgroundColor3 = Color3.fromRGB(45, 45, 45),
 		TextColor3 = Color3.fromRGB(235, 235, 235),
@@ -559,7 +572,21 @@ function SawMillHub:CreateButton(tab, text, callback)
 	end)
 
 	self:UpdateScrolling(tab)
-	return btn
+
+	-- Retorna o objeto de controle
+	return {
+		Button = btn, -- O objeto nativo para acesso direto
+
+		-- Método Get (obter o texto atual)
+		Get = function() 
+			return btn.Text 
+		end,
+
+		-- Método Set (alterar o texto)
+		Set = function(_, newText) 
+			btn.Text = tostring(newText)
+		end
+	}
 end
 
 function SawMillHub:CreateToggle(tab, text, default, callback)
@@ -571,28 +598,25 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 
 	-- CORES NEON VIBRANTES
 	local NEON_ON = Color3.fromRGB(0, 255, 120)    -- Fundo Verde Neon
-	local NEON_OFF_BG = Color3.fromRGB(150, 40, 40) -- Fundo Vermelho Sutil (Para contraste do Handle)
-	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50) -- Vermelho Neon Puro para o Glow
-	local TEXT_COLOR_OFF = Color3.fromRGB(180, 180, 180) -- Cinza para o texto desligado
+	local NEON_OFF_BG = Color3.fromRGB(150, 40, 40) -- Fundo Vermelho Sutil
+	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50) -- Vermelho Neon puro
+	local TEXT_COLOR_OFF = Color3.fromRGB(180, 180, 180)
 
-	-- Estado inicial: Começa DESLIGADO (Vermelho) por padrão
-	local currentState = false 
-	if default == true then
-		currentState = true
-	end
+	-- Estado inicial
+	local currentState = default == true
 
 	-- Posições
 	local ON_POS = UDim2.new(1, -25, 0.5, -12)
 	local OFF_POS = UDim2.new(0, 1, 0.5, -12)
 
-	-- 1. Container principal
+	-- Container principal
 	local toggle = create("Frame", {
 		Parent = container,
 		Size = UDim2.new(1, -10, 0, 45),
 		BackgroundTransparency = 1
 	})
 
-	-- 2. Label
+	-- Label
 	local label = create("TextLabel", {
 		Parent = toggle,
 		Size = UDim2.new(0.7, 0, 1, 0),
@@ -601,33 +625,30 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 		Text = text,
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
-		-- Texto OFF em cinza
-		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF, 
+		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF,
 		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
-	-- 3. Switch base (FUNDO CORRIGIDO)
+	-- Switch base
 	local switch = create("Frame", {
 		Parent = toggle,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -10, 0.5, 0),
 		Size = UDim2.new(0, 55, 0, 26),
-		-- Fundo com cor do estado atual (Verde ou Vermelho Sutil)
 		BackgroundColor3 = currentState and NEON_ON or NEON_OFF_BG,
 		BorderSizePixel = 0,
 	})
 	create("UICorner", {Parent = switch, CornerRadius = UDim.new(1, 0)})
 
-	-- 4. Neon glow animado (UIStroke)
-	-- O glow usa a cor NEON_OFF_GLOW (Vermelho Puro) quando desligado
+	-- Glow neon
 	local glow = create("UIStroke", {
 		Parent = switch,
 		Color = currentState and NEON_ON or NEON_OFF_GLOW,
-		Transparency = currentState and 0.2 or 0.4, -- Transparência mais baixa para o vermelho
+		Transparency = currentState and 0.2 or 0.4,
 		Thickness = 2
 	})
 
-	-- 5. Handle (círculo)
+	-- Handle
 	local handle = create("Frame", {
 		Parent = switch,
 		Size = UDim2.new(0, 24, 0, 24),
@@ -637,7 +658,7 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 	})
 	create("UICorner", {Parent = handle, CornerRadius = UDim.new(1, 0)})
 
-	-- 6. Handle gradiente
+	-- Gradiente animado no handle
 	local gradient = create("UIGradient", {
 		Parent = handle,
 		Color = ColorSequence.new({
@@ -654,7 +675,7 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 		end
 	end)
 
-	-- 7. Função de Pulso
+	-- Função de pulso
 	local function createPulse(color)
 		local pulse = create("Frame", {
 			Parent = switch,
@@ -669,58 +690,68 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 		create("UICorner", {Parent = pulse, CornerRadius = UDim.new(1, 0)})
 
 		TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = UDim2.new(1.8, 0, 1.8, 0), 
+			Size = UDim2.new(1.8, 0, 1.8, 0),
 			BackgroundTransparency = 1
 		}):Play()
 		DebrisService:AddItem(pulse, 0.5)
 	end
 
-	-- 8. Função toggle
-	local function toggleSwitch()
-		currentState = not currentState
+	-- Função principal de toggle
+	local function updateToggle(state, triggerCallback)
+		currentState = state
 
-		-- Animação de Scale click
-		TweenService:Create(switch, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 52, 0, 24)}):Play()
+		-- Animação de click
+		TweenService:Create(switch, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{Size = UDim2.new(0, 52, 0, 24)}
+		):Play()
 		task.delay(0.1, function()
-			TweenService:Create(switch, TweenInfo.new(0.2, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 55, 0, 26)}):Play()
+			TweenService:Create(switch, TweenInfo.new(0.2, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
+				{Size = UDim2.new(0, 55, 0, 26)}
+			):Play()
 		end)
 
-		-- Define as cores alvo
+		-- Define cores
 		local targetGlowColor = currentState and NEON_ON or NEON_OFF_GLOW
-		local targetBGColor = currentState and NEON_ON or NEON_OFF_BG -- Fundo muda de cor
+		local targetBGColor = currentState and NEON_ON or NEON_OFF_BG
 		local targetLabelColor = currentState and NEON_ON or TEXT_COLOR_OFF
 
-		-- Muda cores do Switch, Label e Glow
-		TweenService:Create(switch, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			BackgroundColor3 = targetBGColor
-		}):Play()
-		TweenService:Create(label, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			TextColor3 = targetLabelColor
-		}):Play()
-		TweenService:Create(glow, TweenInfo.new(0.35), {
-			Color = targetGlowColor,
-			Transparency = currentState and 0.2 or 0.4
-		}):Play()
+		-- Atualiza visuais
+		TweenService:Create(switch, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{BackgroundColor3 = targetBGColor}
+		):Play()
+		TweenService:Create(label, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{TextColor3 = targetLabelColor}
+		):Play()
+		TweenService:Create(glow, TweenInfo.new(0.35),
+			{Color = targetGlowColor, Transparency = currentState and 0.2 or 0.4}
+		):Play()
 
 		-- Move handle
-		TweenService:Create(handle, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Position = currentState and ON_POS or OFF_POS
-		}):Play()
+		TweenService:Create(handle, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{Position = currentState and ON_POS or OFF_POS}
+		):Play()
 
-		-- Pulso e feedback visual
+		-- Pulso visual
 		createPulse(targetGlowColor)
 
-		if callback then task.spawn(callback, currentState) end
+		-- Callback
+		if callback and triggerCallback then
+			task.spawn(callback, currentState)
+		end
 	end
 
-	-- Dispara o callback inicial se o estado inicial for ON
+	-- Alternar estado
+	local function toggleSwitch()
+		updateToggle(not currentState, true)
+	end
+
+	-- Dispara callback inicial
 	if currentState and callback then
 		task.spawn(callback, currentState)
 	end
 
-	-- 9. Clique e Hover
+	-- Clique do usuário
 	local isHolding = false
-
 	switch.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			if isHolding then return end
@@ -728,7 +759,6 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 			toggleSwitch()
 		end
 	end)
-
 	switch.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			isHolding = false
@@ -737,20 +767,36 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 
 	-- Hover animado
 	switch.MouseEnter:Connect(function()
-		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-			Thickness = 3, 
-			Transparency = 0.1 
-		}):Play()
+		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+			{Thickness = 3, Transparency = 0.1}
+		):Play()
 	end)
 	switch.MouseLeave:Connect(function()
-		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-			Thickness = 2,
-			Transparency = currentState and 0.2 or 0.4
-		}):Play()
+		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+			{Thickness = 2, Transparency = currentState and 0.2 or 0.4}
+		):Play()
 	end)
 
 	self:UpdateScrolling(tab)
-	return toggle
+
+	-- Retorna um objeto com controle manual
+	local toggleObject = {}
+
+	-- Define o estado manualmente (true = ligado, false = desligado)
+	function toggleObject:Set(state)
+		updateToggle(state, true)
+	end
+
+	-- Pega o estado atual
+	function toggleObject:Get()
+		return currentState
+	end
+
+	-- Referências úteis
+	toggleObject.Frame = toggle
+	toggleObject.Switch = switch
+
+	return toggleObject
 end
 
 function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callback)
@@ -758,12 +804,15 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 	min, max = tonumber(min) or 0, tonumber(max) or 100
 	increment = tonumber(increment) or 1
 
+	local currentValue = default or min -- Armazena o valor atual
+
 	if increment > (max - min) then
 		increment = max - min
 		if increment <= 0 then increment = max end
 	end
 
 	default = math.clamp(default or min, min, max)
+	currentValue = default -- Define o valor inicial
 
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
@@ -832,8 +881,8 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 
 	-- FILL
 	local fill = create("Frame", {
-		Parent = bar,
 		Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+		Parent = bar,
 		BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 	})
 	create("UICorner", { Parent = fill, CornerRadius = UDim.new(0, 5) })
@@ -895,6 +944,10 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 		val = clampToIncrement(val)
 		if val > max then val = max end
 
+		-- Somente atualiza se o valor mudou
+		if val == currentValue then return end
+		currentValue = val
+
 		local pct = (val - min) / (max - min)
 
 		TweenService:Create(fill, TweenInfo.new(instant and 0 or 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -923,7 +976,8 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 			inputCircle.Text = tostring(num)
 			updateSlider(num, true)
 		else
-			inputCircle.Text = tostring(default)
+			-- Se o usuário digitou algo inválido, retorna ao valor atual.
+			inputCircle.Text = tostring(currentValue) 
 		end
 	end)
 
@@ -947,9 +1001,15 @@ function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callba
 		end
 	end)
 
+	-- Inicializa o estado visual
 	updateSlider(default, true)
 	self:UpdateScrolling(tab)
-	return frame
+
+	-- CORREÇÃO APLICADA AQUI: Retorna um objeto de controle com Set/Get.
+	return {
+		Get = function() return currentValue end,
+		Set = function(_, newValue) updateSlider(newValue) end
+	}
 end
 
 function SawMillHub:CreateDropdown(tab, text, options, callback)
@@ -966,6 +1026,9 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local selectedBackground = Color3.fromRGB(45, 45, 45)
 	local optionBackground = Color3.fromRGB(35, 35, 35)
 	local optionHover = Color3.fromRGB(50, 50, 50)
+
+	local selectedValue = nil -- Variável para armazenar o valor selecionado
+	local optionMap = {} -- Mapeamento para acessar as opções por nome
 
 	-- CONTAINER PRINCIPAL
 	local frame = create("Frame", {
@@ -1015,7 +1078,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		BackgroundTransparency = 1,
 		TextColor3 = neonBlue,
 		Font = Enum.Font.GothamBlack,
-		TextSize = 25, 
+		TextSize = 25,
 		ZIndex = 2
 	})
 
@@ -1047,7 +1110,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 
 
 	local open = false
-	local selected = nil
+	local selectedCheck = nil -- Renomeado para evitar conflito com 'selected' da função
 
 	-- ABRIR / FECHAR DROPDOWN (Com Animação de Altura)
 	local function toggleDropdown()
@@ -1080,6 +1143,35 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	end
 
 	btn.MouseButton1Click:Connect(toggleDropdown)
+
+	-- FUNÇÃO CENTRAL DE SELEÇÃO
+	local function selectOption(opt)
+		if selectedCheck then selectedCheck.Visible = false end
+
+		local item = optionMap[opt]
+		if not item then return end -- Opção não existe
+
+		local check = item.Check
+
+		check.Visible = true
+		selectedCheck = check
+		selectedValue = opt -- Atualiza o valor armazenado
+
+		btnLabel.Text = text .. ": " .. opt -- Atualiza o texto do botão principal
+		TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play() -- Destaca o texto selecionado
+		task.delay(0.5, function()
+			TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+		end)
+
+		-- Executa o callback, se existir
+		if callback then pcall(callback, opt) end
+	end
+
+	-- FUNÇÃO DE CLIQUE (para ser usada pelos botões)
+	local function handleOptionClick(opt)
+		selectOption(opt)
+		toggleDropdown() -- Fecha o dropdown após a seleção
+	end
 
 	-- CRIAR OPÇÕES
 	for _, opt in ipairs(options) do
@@ -1118,6 +1210,13 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			Visible = false
 		})
 
+		-- Mapeia a opção
+		optionMap[opt] = {
+			Button = optBtn,
+			Check = check,
+			Callback = function() handleOptionClick(opt) end -- Função de clique mapeada
+		}
+
 		-- HOVER ANIMADO
 		optBtn.MouseEnter:Connect(function()
 			TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = optionHover}):Play()
@@ -1126,31 +1225,25 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			TweenService:Create(optBtn, TweenInfo.new(0.2), {BackgroundColor3 = optionBackground}):Play()
 		end)
 
-		-- SELEÇÃO
-		optBtn.MouseButton1Click:Connect(function()
-			if selected then selected.Visible = false end
-			check.Visible = true
-			selected = check
-
-			btnLabel.Text = text .. ": " .. opt -- Atualiza o texto do botão principal
-			TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play() -- Destaca o texto selecionado
-			task.delay(0.5, function()
-				TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
-			end)
-
-			toggleDropdown()
-			if callback then pcall(callback, opt) end
-		end)
+		-- CONECTA A SELEÇÃO
+		optBtn.MouseButton1Click:Connect(optionMap[opt].Callback)
 	end
 
 	-- Inicializa o texto
 	btnLabel.Text = text .. ": (Selecione)"
 
 	self:UpdateScrolling(tab)
-	return frame
+
+	-- RETORNA O OBJETO DE CONTROLE CORRIGIDO
+	return {
+		Frame = frame, -- Para acesso direto, se necessário
+		Get = function() return selectedValue end,
+		Set = function(_, optionName) selectOption(optionName) end -- O método Set corrigido
+	}
 end
 
 function SawMillHub:CreateInput(tab, text, placeholder, callback)
+	local TweenService = game:GetService("TweenService")
 	if not self.Tabs[tab] then return end
 
 	-- FRAME PRINCIPAL
@@ -1168,7 +1261,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 		Transparency = 0.4
 	})
 
-	-- GLASS SIMULADO + GRADIENT
+	-- GLASS SIMULADO + GRADIENT (Mantido)
 	local glass = create("Frame", {
 		Parent = frame,
 		Size = UDim2.new(1, 0, 1, 0),
@@ -1188,7 +1281,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	})
 	gradient.Parent = glass
 
-	-- LABEL FIXO
+	-- LABEL FIXO (Mantido)
 	local label = create("TextLabel", {
 		Parent = frame,
 		Text = text or "Input",
@@ -1202,7 +1295,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 		ZIndex = 2
 	})
 
-	-- INPUT BOX
+	-- INPUT BOX (Mantido)
 	local box = create("TextBox", {
 		Parent = frame,
 		Text = "",
@@ -1217,7 +1310,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 		ZIndex = 2
 	})
 
-	-- PLACEHOLDER ANIMADO
+	-- PLACEHOLDER ANIMADO (Mantido)
 	local placeholderLbl = create("TextLabel", {
 		Parent = box,
 		Text = placeholder or "Digite aqui...",
@@ -1231,7 +1324,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 		ZIndex = 3
 	})
 
-	-- FUNÇÃO PARA PLACEHOLDER
+	-- FUNÇÃO PARA PLACEHOLDER (Mantida)
 	local function updatePlaceholder()
 		if box.Text == "" and not box:IsFocused() then
 			TweenService:Create(placeholderLbl, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
@@ -1241,7 +1334,7 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	end
 	updatePlaceholder()
 
-	-- FOCO ANIMADO (Glow + Neon)
+	-- FOCO ANIMADO (Mantido)
 	local function focusAnim(focused)
 		if focused then
 			TweenService:Create(stroke, TweenInfo.new(0.25), {
@@ -1280,7 +1373,30 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	box:GetPropertyChangedSignal("Text"):Connect(updatePlaceholder)
 
 	self:UpdateScrolling(tab)
-	return box
+
+	-- RETORNO CORRIGIDO
+	return {
+		Box = box,
+
+		Get = function()
+			return box.Text
+		end,
+
+		Set = function(_, newText, newPlaceholder)
+			-- 1. Se newText NÃO for nil, atualiza o texto principal
+			if newText ~= nil then
+				box.Text = tostring(newText)
+			end
+
+			-- 2. Se newPlaceholder NÃO for nil, atualiza o placeholder
+			if newPlaceholder ~= nil then
+				placeholderLbl.Text = tostring(newPlaceholder)
+			end
+
+			-- Garante que o placeholder seja atualizado após a mudança de texto
+			updatePlaceholder()
+		end
+	}
 end
 -----------------------------------------------------
 -- KEYBIND NEON ÉPICO (Animado + Pulse + Glow)
