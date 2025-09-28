@@ -570,13 +570,13 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 	local container = self.Tabs[tab].Container
 
 	-- CORES NEON VIBRANTES
-	local NEON_ON = Color3.fromRGB(0, 255, 120)    -- Fundo Verde Neon
+	local NEON_ON = Color3.fromRGB(0, 255, 120)    -- Fundo Verde Neon
 	local NEON_OFF_BG = Color3.fromRGB(150, 40, 40) -- Fundo Vermelho Sutil (Para contraste do Handle)
 	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50) -- Vermelho Neon Puro para o Glow
 	local TEXT_COLOR_OFF = Color3.fromRGB(180, 180, 180) -- Cinza para o texto desligado
 
 	-- Estado inicial: Começa DESLIGADO (Vermelho) por padrão
-	local currentState = false 
+	local currentState = false 
 	if default == true then
 		currentState = true
 	end
@@ -602,7 +602,7 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
 		-- Texto OFF em cinza
-		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF, 
+		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF, 
 		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
@@ -669,63 +669,76 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 		create("UICorner", {Parent = pulse, CornerRadius = UDim.new(1, 0)})
 
 		TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = UDim2.new(1.8, 0, 1.8, 0), 
+			Size = UDim2.new(1.8, 0, 1.8, 0), 
 			BackgroundTransparency = 1
 		}):Play()
 		DebrisService:AddItem(pulse, 0.5)
 	end
 
-	-- 8. Função toggle
-	local function toggleSwitch()
-		currentState = not currentState
-
-		-- Animação de Scale click
-		TweenService:Create(switch, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 52, 0, 24)}):Play()
-		task.delay(0.1, function()
-			TweenService:Create(switch, TweenInfo.new(0.2, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 55, 0, 26)}):Play()
-		end)
-
+	-- 8. Função para ATUALIZAR a aparência
+	local function updateAppearance(state, instant)
 		-- Define as cores alvo
-		local targetGlowColor = currentState and NEON_ON or NEON_OFF_GLOW
-		local targetBGColor = currentState and NEON_ON or NEON_OFF_BG -- Fundo muda de cor
-		local targetLabelColor = currentState and NEON_ON or TEXT_COLOR_OFF
+		local targetGlowColor = state and NEON_ON or NEON_OFF_GLOW
+		local targetBGColor = state and NEON_ON or NEON_OFF_BG -- Fundo muda de cor
+		local targetLabelColor = state and NEON_ON or TEXT_COLOR_OFF
+		local targetHandlePos = state and ON_POS or OFF_POS
+		local t = instant and 0 or 0.35
 
 		-- Muda cores do Switch, Label e Glow
-		TweenService:Create(switch, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		TweenService:Create(switch, TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			BackgroundColor3 = targetBGColor
 		}):Play()
-		TweenService:Create(label, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		TweenService:Create(label, TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			TextColor3 = targetLabelColor
 		}):Play()
-		TweenService:Create(glow, TweenInfo.new(0.35), {
+		TweenService:Create(glow, TweenInfo.new(t), {
 			Color = targetGlowColor,
-			Transparency = currentState and 0.2 or 0.4
+			Transparency = state and 0.2 or 0.4
 		}):Play()
 
 		-- Move handle
-		TweenService:Create(handle, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Position = currentState and ON_POS or OFF_POS
+		local handleT = instant and 0 or 0.3
+		local handleStyle = instant and Enum.EasingStyle.Linear or Enum.EasingStyle.Back
+		TweenService:Create(handle, TweenInfo.new(handleT, handleStyle, Enum.EasingDirection.Out), {
+			Position = targetHandlePos
 		}):Play()
+	end
+    
+    -- 9. Função toggle principal (com animação de clique)
+	local function toggleSwitch(fromClick)
+		currentState = not currentState
 
-		-- Pulso e feedback visual
-		createPulse(targetGlowColor)
+		if fromClick then
+			-- Animação de Scale click
+			TweenService:Create(switch, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 52, 0, 24)}):Play()
+			task.delay(0.1, function()
+				TweenService:Create(switch, TweenInfo.new(0.2, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 55, 0, 26)}):Play()
+			end)
+			
+			-- Pulso e feedback visual
+			createPulse(currentState and NEON_ON or NEON_OFF_GLOW)
+		end
+
+        -- Atualiza a aparência
+        updateAppearance(currentState, not fromClick)
 
 		if callback then task.spawn(callback, currentState) end
 	end
-
-	-- Dispara o callback inicial se o estado inicial for ON
-	if currentState and callback then
-		task.spawn(callback, currentState)
+    
+    -- Se o estado inicial for ON, define a aparência e dispara o callback
+	if currentState then
+        updateAppearance(currentState, true) -- Atualiza a aparência instantaneamente
+		if callback then task.spawn(callback, currentState) end
 	end
 
-	-- 9. Clique e Hover
+	-- 10. Conexão de Clique e Hover
 	local isHolding = false
 
 	switch.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			if isHolding then return end
 			isHolding = true
-			toggleSwitch()
+			toggleSwitch(true) -- Passa 'true' para indicar que veio de um clique
 		end
 	end)
 
@@ -738,8 +751,8 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 	-- Hover animado
 	switch.MouseEnter:Connect(function()
 		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-			Thickness = 3, 
-			Transparency = 0.1 
+			Thickness = 3, 
+			Transparency = 0.1 
 		}):Play()
 	end)
 	switch.MouseLeave:Connect(function()
@@ -750,7 +763,30 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 	end)
 
 	self:UpdateScrolling(tab)
-	return toggle
+    
+    -----------------------------------------------------
+	-- SISTEMA SET/GET
+	-----------------------------------------------------
+    local ToggleObject = {}
+    
+    -- Permite definir o estado (ligar/desligar) programaticamente
+    function ToggleObject:Set(value)
+        value = (value == true) -- Garante que é um booleano
+        
+        -- Verifica se o valor é diferente do estado atual para evitar loops e animações desnecessárias
+        if value ~= currentState then
+            currentState = value
+            updateAppearance(currentState, false) -- Anima para o novo estado
+            if callback then task.spawn(callback, currentState) end -- Dispara o callback
+        end
+    end
+    
+    -- Permite obter o estado atual
+    function ToggleObject:Get()
+        return currentState
+    end
+
+	return setmetatable(ToggleObject, {__index = ToggleObject})
 end
 
 function SawMillHub:CreateSlider(tab, text, min, max, default, increment, callback)
