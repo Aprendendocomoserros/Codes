@@ -37,8 +37,6 @@ function SawMillHub:Close(skipOnCloseEvent)
 	local currentSize = self.Main.Size
 	local currentPos = self.Main.Position
 
-    -- ... (Animações e destruição, seu código aqui) ...
-
 	-- 2. Animação de Fechamento
 	local targetXOffset = currentPos.X.Offset + currentSize.X.Offset * 0.05
 	local targetYOffset = currentPos.Y.Offset + currentSize.Y.Offset * 0.05
@@ -127,7 +125,9 @@ function SawMillHub.new(title, dragSpeed)
 	self.Gui = create("ScreenGui", {
 		Parent = CoreGui,
 		ResetOnSpawn = false,
-		Name = "SawMillHub"
+		Name = "SawMillHub",
+        -- 💡 AQUI ESTÁ A MELHORIA: ZIndexBehavior Global!
+        ZIndexBehavior = Enum.ZIndexBehavior.Global 
 	})
 
 	-- Armazena a referência do objeto Hub na ScreenGui para acesso posterior
@@ -159,6 +159,7 @@ function SawMillHub.new(title, dragSpeed)
 	local topBar = create("Frame", {
 		Parent = self.Main,
 		Size = UDim2.new(1, 0, 0, 42),
+		Position = UDim2.new(0, 0, 0, 0), -- Posição corrigida (estava faltando no original)
 		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
 		Name = "TopBar"
 	})
