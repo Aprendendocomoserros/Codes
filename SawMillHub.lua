@@ -275,52 +275,27 @@ function SawMillHub.new(title, dragSpeed)
 	-----------------------------------------------------
 
 	-----------------------------------------------------
-	-- Sistema de Drag com efeito “Lag”
-	-----------------------------------------------------
-	-----------------------------------------------------
-	-- Sistema de Drag com efeito “Lag” (Corrigido para FPS)
+	-- Sistema de Drag com efeito “Lag” (Correção Final para FPS)
 	-----------------------------------------------------
 	local dragging = false
 	local dragInput, dragStart, startPos
 	local targetPos = self.Main.Position
     
-    -- Novo: Variável de controle para o modo secundário de arrastar
+    -- Variável de controle para o modo secundário de arrastar
     local canDrag = false 
+    local dragKey = Enum.KeyCode.RightControl -- A chave que você escolheu
 
 	-- Define quão rápido o frame segue o mouse
 	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 -- Slow = devagar, Default = instantâneo
 
     ----------------------------------------------------------------
-    -- LÓGICA DE DRAG SECUNDÁRIO: Pressionar 'LeftShift' para habilitar o arrasto
+    -- LÓGICA DE DRAG SECUNDÁRIO: Pressionar 'RightControl' para habilitar
     ----------------------------------------------------------------
-    local function checkDragKey(input, state)
-        -- Você pode mudar LeftShift para LeftControl, RightClick, etc.
-        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightControl then
-            canDrag = state 
-            UserInputService.MouseIconEnabled = canDrag -- Mostra/Esconde o cursor
-        end
-    end
-
-    -- Eventos para habilitar o arrasto (segurando a tecla)
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        checkDragKey(input, true)
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        checkDragKey(input, false)
-        -- Também garante que o drag termine se a tecla for solta
-        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightControl then
-            if dragging then
-                dragging = false
-            end
-        end
-    end)
-    ----------------------------------------------------------------
-
+	
+    -- Lógica de arrasto normal (InputBegan na TopBar)
 	topBar.InputBegan:Connect(function(input)
-        -- O drag só começa se a tecla secundária estiver pressionada OU se for um input normal (fora de modo FPS)
-		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and (not LocalPlayer.CameraMode.Lock and not canDrag) or canDrag then
+        -- Permite o drag normal se não for FPS ou se for Touch
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not LocalPlayer.CameraMode.Lock then
 			dragging = true
 			dragStart = input.Position
 			startPos = self.Main.Position
@@ -328,34 +303,77 @@ function SawMillHub.new(title, dragSpeed)
 		end
 	end)
 
-	topBar.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
+    -- Lógica de arrasto FPS (InputBegan global)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        -- 1. Ativa/Desativa o modo secundário
+        if input.KeyCode == dragKey then
+            canDrag = true
+            -- Mostra o cursor do mouse
+            UserInputService.MouseIconEnabled = true
+        end
 
+        -- 2. Se estiver no modo de arrasto secundário E for o clique...
+        if canDrag and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            -- Para iniciar o drag, o clique PRECISA estar sobre a barra superior (TopBar)
+            local mousePos = input.Position
+            local mainPos = self.Main.AbsolutePosition
+            
+            -- Calculamos a área da TopBar (42px de altura)
+            local topBarYMax = mainPos.Y + topBar.AbsoluteSize.Y
+            
+            if mousePos.Y < topBarYMax and mousePos.Y > mainPos.Y then
+                dragging = true
+                dragStart = mousePos
+                startPos = self.Main.Position
+                dragInput = input
+            end
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        -- Desativa o modo secundário se a tecla for solta
+        if input.KeyCode == dragKey then
+            canDrag = false
+            UserInputService.MouseIconEnabled = false
+            -- Para o arrasto imediatamente
+            if dragging then
+                dragging = false
+            end
+        end
+
+        -- Para o arrasto se o clique/toque for solto
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    -- InputChanged (movimento) é sempre global
 	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			local delta = input.Position - dragStart
-			targetPos = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + delta.X,
-				startPos.Y.Scale, startPos.Y.Offset + delta.Y
-			)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            dragInput = input
 		end
 	end)
 
 	-- RenderLoop para animação suave
 	RunService.RenderStepped:Connect(function(dt)
-		if dragging or (self.Main.Position ~= targetPos) then
+		if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+			targetPos = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y
+			)
+			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
+		end
+        
+        -- Garante que o Lerp ocorra mesmo que o drag tenha parado (para finalizar a animação)
+        if not dragging and (self.Main.Position ~= targetPos) then
 			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
 		end
 	end)
+	-----------------------------------------------------
+	-- Fim Sistema de Drag
+	-----------------------------------------------------
 
-	topBar.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
 
 	-----------------------------------------------------
 	-- Sidebar + TabHolder
