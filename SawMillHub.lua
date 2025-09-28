@@ -31,11 +31,13 @@ function SawMillHub:Close(skipOnCloseEvent)
 
 	-- 1. Dispara o evento de fechar
 	if not skipOnCloseEvent and self.OnClose and type(self.OnClose) == "function" then
-		pcall(self.OnClose)
+		pcall(self.OnClose) -- Garante que o OnClose seja chamado
 	end
 
 	local currentSize = self.Main.Size
 	local currentPos = self.Main.Position
+
+    -- ... (Animações e destruição, seu código aqui) ...
 
 	-- 2. Animação de Fechamento
 	local targetXOffset = currentPos.X.Offset + currentSize.X.Offset * 0.05
