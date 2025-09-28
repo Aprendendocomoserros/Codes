@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = LocalPlayer:WaitForChild("PlayerGui") 
+local Mouse = LocalPlayer:GetMouse() -- Novo: Obtemos o objeto Mouse
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
@@ -275,17 +276,15 @@ function SawMillHub.new(title, dragSpeed)
 	-----------------------------------------------------
 
 	-----------------------------------------------------
-	-- Sistema de Drag (Normal + FPS por WASD)
+	-- Sistema de Drag (Normal + FPS por Posição Forçada)
 	-----------------------------------------------------
 	local dragging = false
-	local dragInput, dragStart, startPos
+	local dragStartOffset = Vector2.new(0, 0) -- Distância do mouse até a âncora da GUI no clique
 	local targetPos = self.Main.Position
     
     -- Variáveis para o modo de movimento por teclado
     local canDrag = false 
     local dragKey = Enum.KeyCode.RightControl
-    local moveVector = Vector2.new(0, 0) -- Rastreia o movimento WASD
-    local dragSpeedPerFrame = 10 -- Velocidade de movimento da GUI (em pixels)
 
 	-- Define quão rápido o frame segue o mouse/alvo
 	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 
@@ -297,19 +296,13 @@ function SawMillHub.new(title, dragSpeed)
         -- Permite o drag normal se for MouseButton1/Touch E a câmera não estiver travada (não é FPS)
 		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not LocalPlayer.CameraMode.Lock then
 			dragging = true
-			dragStart = input.Position
-			startPos = self.Main.Position
-			dragInput = input
+			
+			-- Calcula a distância do mouse até o canto superior esquerdo da Main
+			local mainPos = self.Main.AbsolutePosition
+			dragStartOffset = input.Position - mainPos 
 		end
 	end)
 
-	-- Continua arrastando com o movimento do mouse
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            dragInput = input
-		end
-	end)
-    
 	topBar.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = false
@@ -317,34 +310,28 @@ function SawMillHub.new(title, dragSpeed)
 	end)
     
     ----------------------------------------------------------------
-    -- LÓGICA DE DRAG FPS (Teclado WASD)
+    -- LÓGICA DE DRAG FPS (Mouse Travado, RightControl)
     ----------------------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        -- 1. Ativa o modo de movimento por teclado (RightControl)
+        -- 1. Ativa/Desativa o modo secundário (RightControl)
         if input.KeyCode == dragKey then
             canDrag = true
-            -- Mostra o cursor para que o clique na TopBar possa ser detectado
-            UserInputService.MouseIconEnabled = true 
+            UserInputService.MouseIconEnabled = true
         end
-        
-        -- 2. Rastreia o movimento WASD
-        if canDrag then
-            if input.KeyCode == Enum.KeyCode.W then moveVector = moveVector + Vector2.new(0, -1) end
-            if input.KeyCode == Enum.KeyCode.S then moveVector = moveVector + Vector2.new(0, 1) end
-            if input.KeyCode == Enum.KeyCode.A then moveVector = moveVector + Vector2.new(-1, 0) end
-            if input.KeyCode == Enum.KeyCode.D then moveVector = moveVector + Vector2.new(1, 0) end
-        end
-        
-        -- 3. Inicia o "dragging" para permitir o movimento WASD
+
+        -- 2. Inicia o arrasto se for RightControl + Clique na TopBar
         if canDrag and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            -- Apenas inicia o arrasto se o clique estiver sobre a TopBar
             local mousePos = input.Position
             local mainPos = self.Main.AbsolutePosition
+            
+            -- Verifica se o clique está sobre a TopBar (altura de 42px)
             local topBarYMax = mainPos.Y + topBar.AbsoluteSize.Y
             
             if mousePos.Y < topBarYMax and mousePos.Y > mainPos.Y then
                 dragging = true
-                -- No modo WASD, dragStart e dragInput não importam, mas 'dragging' precisa ser true
+                
+                -- Calcula a distância do mouse até o canto superior esquerdo da Main
+                dragStartOffset = mousePos - mainPos 
             end
         end
     end)
@@ -354,50 +341,39 @@ function SawMillHub.new(title, dragSpeed)
         if input.KeyCode == dragKey then
             canDrag = false
             UserInputService.MouseIconEnabled = false
-            -- Garante que o arrasto pare ao soltar RightControl
             dragging = false 
         end
 
-        -- Para o arrasto se o clique for solto
+        -- Para o arrasto se o clique/toque for solto
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
-        
-        -- Zera o vetor de movimento WASD
-        if canDrag then
-            if input.KeyCode == Enum.KeyCode.W then moveVector = moveVector - Vector2.new(0, -1) end
-            if input.KeyCode == Enum.KeyCode.S then moveVector = moveVector - Vector2.new(0, 1) end
-            if input.KeyCode == Enum.KeyCode.A then moveVector = moveVector - Vector2.new(-1, 0) end
-            if input.KeyCode == Enum.KeyCode.D then moveVector = moveVector - Vector2.new(1, 0) end
-        end
     end)
-    
+
     ----------------------------------------------------------------
     -- RenderLoop (Execução do Movimento)
     ----------------------------------------------------------------
 	RunService.RenderStepped:Connect(function(dt)
-        -- Movimento de Arrasto Normal (Mouse)
-		if dragging and not canDrag and dragInput then
-            local delta = dragInput.Position - dragStart
-			targetPos = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + delta.X,
-				startPos.Y.Scale, startPos.Y.Offset + delta.Y
-			)
-        
-        -- Movimento de Arrasto FPS (WASD)
-        elseif dragging and canDrag and moveVector ~= Vector2.new(0, 0) then
-            -- Normaliza o vetor para que W+A não seja mais rápido que W
-            local normalizedMove = moveVector.Magnitude > 0 and moveVector.Unit or moveVector
+		if dragging then
+            local currentMousePos = Vector2.new(Mouse.X, Mouse.Y)
             
-            -- Aplica o movimento ao targetPos
-            targetPos = UDim2.new(
-                targetPos.X.Scale, targetPos.X.Offset + normalizedMove.X * dragSpeedPerFrame,
-                targetPos.Y.Scale, targetPos.Y.Offset + normalizedMove.Y * dragSpeedPerFrame
-            )
-		end
-        
-        -- Animação (Lerp)
-		if (dragging or self.Main.Position ~= targetPos) then
+            -- Se for o modo FPS (Mouse travado), usamos a posição absoluta do mouse
+            -- Caso contrário, usamos a posição absoluta do mouse para calcular o target.
+            -- A posição do target é o Mouse - o Offset inicial (dragStartOffset)
+            local newXOffset = currentMousePos.X - dragStartOffset.X
+            local newYOffset = currentMousePos.Y - dragStartOffset.Y
+
+            -- Define a posição alvo
+			targetPos = UDim2.new(
+				0, newXOffset, -- Sempre 0 Scale, movemos por Offset
+				0, newYOffset
+			)
+            
+            -- Animação (Lerp)
+			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
+            
+		elseif not dragging and (self.Main.Position ~= targetPos) then
+            -- Garante que o Lerp finalize a animação quando parar de arrastar
 			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
 		end
 	end)
