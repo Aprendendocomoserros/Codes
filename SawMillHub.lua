@@ -5,7 +5,7 @@ local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = LocalPlayer:WaitForChild("PlayerGui") 
-local Mouse = LocalPlayer:GetMouse() 
+local Mouse = LocalPlayer:GetMouse() -- Objeto Mouse para posição absoluta
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
@@ -113,7 +113,6 @@ function SawMillHub.new(title, dragSpeed)
 		if oldHub and oldHub.Value then
 			local oldHubInstance = oldHub.Value
 			if oldHubInstance and oldHubInstance.Close then
-				-- Chama o Close() da instância antiga, disparando o OnClose dela.
 				task.spawn(function()
 					oldHubInstance:Close()
 				end)
@@ -129,7 +128,6 @@ function SawMillHub.new(title, dragSpeed)
 	local self = setmetatable({}, SawMillHub)
 	local isTouch = UserInputService.TouchEnabled
 
-	-- Propriedade OnClose
 	self.OnClose = nil
 
 	self.Gui = create("ScreenGui", {
@@ -138,7 +136,6 @@ function SawMillHub.new(title, dragSpeed)
 		Name = "SawMillHub"
 	})
 
-	-- Armazena a referência do objeto Hub na ScreenGui para acesso posterior
 	local hubRef = create("ObjectValue", {
 		Parent = self.Gui,
 		Name = "SawMillHubObject",
@@ -184,39 +181,15 @@ function SawMillHub.new(title, dragSpeed)
 		Font = Enum.Font.GothamBold,
 		TextSize = 18
 	})
-
-	-- CORES DO BOTÃO DE FECHAR
+    
+	-- CORES DO BOTÃO DE FECHAR (mantidas)
 	local baseRed = Color3.fromRGB(255, 60, 60)
 	local hoverRed = Color3.fromRGB(255, 100, 100)
 	local clickRed = Color3.fromRGB(180, 0, 0)
 	local neonRed = Color3.fromRGB(255, 0, 0)
-    
-    -- CORES DO BOTÃO DE MOVER
-    local moveBase = Color3.fromRGB(60, 60, 255)
-    local moveActive = Color3.fromRGB(120, 120, 255)
-
 
 	-----------------------------------------------------
-    -- NOVO: Botão de Ativar Movimento (Ancora do Mouse)
-    -----------------------------------------------------
-    local moveButton = create("TextButton", {
-		Parent = topBar,
-		Text = "Move",
-		Size = UDim2.new(0, 45, 0, 32),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -44, 0.5, 0),
-		BackgroundColor3 = moveBase,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		AutoButtonColor = false,
-		ZIndex = 2
-	})
-	create("UICorner", { Parent = moveButton, CornerRadius = UDim.new(0, 8) })
-
-
-	-----------------------------------------------------
-	-- Botão de Fechar GUI (X) ❌ (Animado)
+	-- Botão de Fechar GUI (X) ❌ (Simples, para reduzir o código)
 	-----------------------------------------------------
 	local closeButton = create("TextButton", {
 		Parent = topBar,
@@ -231,130 +204,68 @@ function SawMillHub.new(title, dragSpeed)
 		AutoButtonColor = false,
 		ZIndex = 2
 	})
-    -- ... (O código do botão de fechar foi omitido para simplificar, mas ele estava na sua versão anterior e você pode recolocá-lo aqui) ...
-    create("UICorner", { Parent = closeButton, CornerRadius = UDim.new(0, 8) })
-    -- (Aqui estaria a lógica do closeButton, omitida para brevidade no módulo final)
-	closeButton.MouseButton1Click:Connect(function() self:Close() end)
-
+	create("UICorner", { Parent = closeButton, CornerRadius = UDim.new(0, 8) })
+	
+    -- Lógica para fechar
+	closeButton.MouseButton1Click:Connect(function()
+		self:Close()
+	end)
+	-----------------------------------------------------
+	-- Fim Botão de Fechar
+	-----------------------------------------------------
 
 	-----------------------------------------------------
-	-- Sistema de Drag (Normal + FPS por Ativação de Teclado)
+	-- Sistema de Drag Principal (Força Mouse Absoluto)
 	-----------------------------------------------------
 	local dragging = false
 	local dragStartOffset = Vector2.new(0, 0) 
-	local targetPos = self.Main.Position
+	local targetPos = self.Main.Position -- Posição alvo para o Lerp
     
-    -- Variáveis para o modo de movimento por teclado
-    local canDragFPS = false        -- Ativa pelo RightControl (Habilita arrasto por WASD)
-    local isMovingWithKeys = false  -- Ativa pelo moveButton (Indica que estamos no modo de movimento ativo)
-    local dragKey = Enum.KeyCode.RightControl
-    local moveVector = Vector2.new(0, 0) -- Rastreia o movimento WASD
-    local dragSpeedPerFrame = 10 
-
 	-- Define quão rápido o frame segue o mouse/alvo
 	local lerpSpeed = (dragSpeed == "Slow") and 0.1 or 1 
 
-    ----------------------------------------------------------------
-    -- LÓGICA DE DRAG NORMAL (Mouse Livre)
-    ----------------------------------------------------------------
+    -- Inicia o arrasto
 	topBar.InputBegan:Connect(function(input)
-        -- Drag normal só funciona se não for touch E a câmera não estiver travada E o modo FPS não estiver ativo
-		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not LocalPlayer.CameraMode.Lock and not isMovingWithKeys then
+        -- Apenas para Mouse ou Touch
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
+			
+			-- Calcula a distância do clique até o canto superior esquerdo da Main
 			local mainPos = self.Main.AbsolutePosition
 			dragStartOffset = input.Position - mainPos 
 		end
 	end)
 
+    -- Finaliza o arrasto
 	topBar.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = false
 		end
 	end)
-    
-    ----------------------------------------------------------------
-    -- LÓGICA DE DRAG FPS/TECLADO (RightControl + WASD)
-    ----------------------------------------------------------------
-    
-    -- 1. Ativação do modo FPS (RightControl)
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if input.KeyCode == dragKey then
-            canDragFPS = true
-        end
-        
-        -- 2. Rastreia o movimento WASD (SÓ se estiver no modo de movimento ativo)
-        if isMovingWithKeys then
-            if input.KeyCode == Enum.KeyCode.W then moveVector = moveVector + Vector2.new(0, -1) end
-            if input.KeyCode == Enum.KeyCode.S then moveVector = moveVector + Vector2.new(0, 1) end
-            if input.KeyCode == Enum.KeyCode.A then moveVector = moveVector + Vector2.new(-1, 0) end
-            if input.KeyCode == Enum.KeyCode.D then moveVector = moveVector + Vector2.new(1, 0) end
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        -- Desativa o modo FPS (RightControl)
-        if input.KeyCode == dragKey then
-            canDragFPS = false
-            
-            -- Se estava movendo, para o movimento
-            if isMovingWithKeys then
-                isMovingWithKeys = false
-                TweenService:Create(moveButton, TweenInfo.new(0.2), {BackgroundColor3 = moveBase}):Play()
-            end
-        end
-
-        -- Zera o vetor de movimento WASD
-        if isMovingWithKeys then
-            if input.KeyCode == Enum.KeyCode.W then moveVector = moveVector - Vector2.new(0, -1) end
-            if input.KeyCode == Enum.KeyCode.S then moveVector = moveVector - Vector2.new(0, 1) end
-            if input.KeyCode == Enum.KeyCode.A then moveVector = moveVector - Vector2.new(-1, 0) end
-            if input.KeyCode == Enum.KeyCode.D then moveVector = moveVector - Vector2.new(1, 0) end
-        end
-    end)
-    
-    -- 3. Botão "Move" Ativa/Desativa o arrasto por teclado
-    moveButton.MouseButton1Click:Connect(function()
-        if canDragFPS then
-            isMovingWithKeys = not isMovingWithKeys
-            
-            if isMovingWithKeys then
-                TweenService:Create(moveButton, TweenInfo.new(0.1), {BackgroundColor3 = moveActive}):Play()
-                moveButton.Text = "Moving..."
-            else
-                TweenService:Create(moveButton, TweenInfo.new(0.2), {BackgroundColor3 = moveBase}):Play()
-                moveButton.Text = "Move"
-            end
-        end
-    end)
-    
 
     ----------------------------------------------------------------
-    -- RenderLoop (Execução do Movimento)
+    -- RenderLoop (Execução do Movimento de Arrasto)
     ----------------------------------------------------------------
 	RunService.RenderStepped:Connect(function(dt)
-        
-        -- Modo 1: Mouse Livre (Normal Drag)
 		if dragging then
+            -- Obtém a posição absoluta do mouse (funciona mesmo que o cursor seja resetado)
             local currentMousePos = Vector2.new(Mouse.X, Mouse.Y)
             
+            -- O novo canto da GUI é a posição do mouse menos o offset inicial
             local newXOffset = currentMousePos.X - dragStartOffset.X
             local newYOffset = currentMousePos.Y - dragStartOffset.Y
 
-			targetPos = UDim2.new(0, newXOffset, 0, newYOffset)
+			-- Define a posição alvo
+			targetPos = UDim2.new(
+				0, newXOffset, -- Sempre 0 Scale, movemos por Offset
+				0, newYOffset
+			)
             
-        -- Modo 2: Teclado (FPS Drag)
-        elseif isMovingWithKeys and moveVector ~= Vector2.new(0, 0) then
-            -- A GUI é movida continuamente enquanto as teclas WASD estiverem pressionadas
-            local normalizedMove = moveVector.Magnitude > 0 and moveVector.Unit or moveVector
+            -- Animação (Lerp)
+			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
             
-            targetPos = UDim2.new(
-                targetPos.X.Scale, targetPos.X.Offset + normalizedMove.X * dragSpeedPerFrame,
-                targetPos.Y.Scale, targetPos.Y.Offset + normalizedMove.Y * dragSpeedPerFrame
-            )
-		end
-        
-        -- Animação (Lerp)
-		if (dragging or isMovingWithKeys or self.Main.Position ~= targetPos) then
+		elseif not dragging and (self.Main.Position ~= targetPos) then
+            -- Garante que o Lerp finalize a animação quando parar de arrastar
 			self.Main.Position = self.Main.Position:Lerp(targetPos, lerpSpeed)
 		end
 	end)
