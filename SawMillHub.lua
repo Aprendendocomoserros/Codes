@@ -309,7 +309,7 @@ function SawMillHub:CreateLabel(tab, text)
 		TextYAlignment = Enum.TextYAlignment.Center
 	})
 
-	-- Hover sutil para PC (não interfere no celular)
+	-- Hover (apenas PC)
 	frame.MouseEnter:Connect(function()
 		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
 			BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -326,10 +326,15 @@ function SawMillHub:CreateLabel(tab, text)
 	return {
 		Frame = frame,
 		Label = lbl,
-		SetText = function(_, newText)
+		SetText = function(self, newText)
 			lbl.Text = tostring(newText)
 		end,
-		GetText = function() return lbl.Text end
+		GetText = function(self)
+			return lbl.Text
+		end,
+		Destroy = function(self)
+			frame:Destroy()
+		end
 	}
 end
 
