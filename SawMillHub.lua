@@ -8,12 +8,14 @@ local CoreGui = LocalPlayer:WaitForChild("PlayerGui")
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
 
--- Criador seguro de instâncias
+-- Criador seguro de Instâncias
 local function create(class, props)
 	local inst = Instance.new(class)
 	if props then
 		for k, v in pairs(props) do
-			pcall(function() inst[k] = v end)
+			pcall(function()
+				inst[k] = v
+			end)
 		end
 	end
 	return inst
@@ -22,12 +24,19 @@ end
 -- Sistema Draggable apenas na TopBar
 local function enableDragging(topBar, mainFrame, dragSpeed)
 	if not topBar or not mainFrame then return end
+
 	local dragging = false
 	local dragStart, startPos
-	local speed = (dragSpeed == "Slow") and 0.2 or 1
+
+	local speed = 1
+	if dragSpeed == "Slow" then
+		speed = 0.2
+	elseif dragSpeed == "Default" then
+		speed = 1
+	end
 
 	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
 			startPos = mainFrame.Position
@@ -40,7 +49,7 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local delta = input.Position - dragStart
 			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 				startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -55,154 +64,136 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	end)
 end
 
--- =========================
--- Tabela de Temas
--- =========================
-SawMillHub.Themes = {
-	Dark = {
-		MainBg = Color3.fromRGB(25,25,25),
-		TopBar = Color3.fromRGB(18,18,18),
-		Sidebar = Color3.fromRGB(18,18,18),
-		TabHolder = Color3.fromRGB(32,32,32),
-		Button = Color3.fromRGB(45,45,45),
-		ButtonHover = Color3.fromRGB(60,60,60),
-		ButtonText = Color3.fromRGB(235,235,235),
-		ButtonStroke = Color3.fromRGB(70,70,70),
-		SliderBar = Color3.fromRGB(50,50,50),
-		SliderFill = Color3.fromRGB(90,90,90),
-		SliderThumb = Color3.fromRGB(120,120,120),
-		LabelText = Color3.fromRGB(235,235,235),
-		CloseButton = Color3.fromRGB(200,50,50),
-		MinimizeButton = Color3.fromRGB(200,200,50)
-	},
-	Light = {
-		MainBg = Color3.fromRGB(245,245,245),
-		TopBar = Color3.fromRGB(220,220,220),
-		Sidebar = Color3.fromRGB(230,230,230),
-		TabHolder = Color3.fromRGB(240,240,240),
-		Button = Color3.fromRGB(210,210,210),
-		ButtonHover = Color3.fromRGB(180,180,180),
-		ButtonText = Color3.fromRGB(25,25,25),
-		ButtonStroke = Color3.fromRGB(100,100,100),
-		SliderBar = Color3.fromRGB(200,200,200),
-		SliderFill = Color3.fromRGB(150,150,150),
-		SliderThumb = Color3.fromRGB(120,120,120),
-		LabelText = Color3.fromRGB(25,25,25),
-		CloseButton = Color3.fromRGB(220,50,50),
-		MinimizeButton = Color3.fromRGB(220,220,50)
-	}
-}
+-- Função para fechar o Hub
+function SawMillHub:Close()
+	if not self.Gui or not self.Main then return end
+	if self._IsClosing then return end
+	self._IsClosing = true
 
--- =========================
--- Função SetTheme
--- =========================
-function SawMillHub:SetTheme(themeName)
-	local theme = self.Themes[themeName]
-	if not theme then return end
-	self.CurrentTheme = theme
+	if self.OnClose then
+		pcall(function()
+			self.OnClose:Fire()
+		end)
+	end
 
-	if self.Main then self.Main.BackgroundColor3 = theme.MainBg end
-	if self.TopBar then self.TopBar.BackgroundColor3 = theme.TopBar end
-	if self.Sidebar then self.Sidebar.BackgroundColor3 = theme.Sidebar end
-	if self.TabHolder then self.TabHolder.BackgroundColor3 = theme.TabHolder end
+	local currentSize = self.Main.Size
+	local currentPos = self.Main.Position
 
-	-- Atualiza botões Close/Minimize
-	if self.CloseBtn then self.CloseBtn.BackgroundColor3 = theme.CloseButton end
-	if self.MinimizeBtn then self.MinimizeBtn.BackgroundColor3 = theme.MinimizeButton end
+	TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = UDim2.new(currentSize.X.Scale, currentSize.X.Offset * 0.9,
+			currentSize.Y.Scale, currentSize.Y.Offset * 0.9),
+		Position = UDim2.new(currentPos.X.Scale, currentPos.X.Offset + currentSize.X.Offset * 0.05,
+			currentPos.Y.Scale, currentPos.Y.Offset + currentSize.Y.Offset * 0.05),
+		BackgroundTransparency = 1
+	}):Play()
+
+	for _, child in ipairs(self.Main:GetDescendants()) do
+		if child:IsA("GuiObject") then
+			local properties = {}
+			if typeof(child.BackgroundTransparency) == "number" then
+				properties.BackgroundTransparency = 1
+			end
+			if (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox"))
+				and typeof(child.TextTransparency) == "number" then
+				properties.TextTransparency = 1
+			end
+			if (child:IsA("ImageLabel") or child:IsA("ImageButton"))
+				and typeof(child.ImageTransparency) == "number" then
+				properties.ImageTransparency = 1
+			end
+			if child:IsA("UIStroke") and typeof(child.Transparency) == "number" then
+				properties.Transparency = 1
+			end
+			if next(properties) then
+				TweenService:Create(child, TweenInfo.new(0.25), properties):Play()
+			end
+		end
+	end
+
+	task.delay(0.35, function()
+		if self.Gui and self.Gui.Parent then
+			self.Gui:Destroy()
+		end
+		self._IsClosing = false
+	end)
 end
 
--- =========================
--- Criação do Hub
--- =========================
-function SawMillHub.new(title, dragSpeed, themeName)
+-- Função para minimizar/restaurar o Hub
+function SawMillHub:ToggleMinimize()
+	if self._Minimized then
+		TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = self._OriginalSize
+		}):Play()
+		self._Minimized = false
+	else
+		local newSize = UDim2.new(self._OriginalSize.X.Scale, self._OriginalSize.X.Offset, 0, 42)
+		TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = newSize
+		}):Play()
+		self._Minimized = true
+	end
+end
+
+-- Construtor principal do Hub
+function SawMillHub.new(title, dragSpeed)
+	dragSpeed = dragSpeed or "Default"
+
 	local self = setmetatable({}, SawMillHub)
 	self.OnClose = Instance.new("BindableEvent")
-	self.Tabs = {}
-	local theme = SawMillHub.Themes[themeName] or SawMillHub.Themes.Dark
-	self.CurrentTheme = theme
 
 	self.Gui = create("ScreenGui", { Parent = CoreGui, ResetOnSpawn = false, Name = "SawMillHub" })
+	create("ObjectValue", { Parent = self.Gui, Name = "SawMillHubObject", Value = self, Archivable = false })
 
-	-- Main
-	local mainSize = UDim2.new(0,560,0,400)
+	self.Gui.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			pcall(function() self.OnClose:Fire() end)
+		end
+	end)
+
+	-- === Detecta celular ===
+	local isTouch = UserInputService.TouchEnabled
+
+	-- === Layout principal ===
+	local mainSize = isTouch and UDim2.new(0, 450, 0, 320) or UDim2.new(0, 560, 0, 400)
 	local mainPos = UDim2.new(0.5, -mainSize.X.Offset/2, 0.5, -mainSize.Y.Offset/2)
-	self.Main = create("Frame", { Parent = self.Gui, Size = mainSize, Position = mainPos, BackgroundColor3 = theme.MainBg, ClipsDescendants = true })
-	create("UICorner",{Parent=self.Main, CornerRadius=UDim.new(0,12)})
-	create("UIStroke",{Parent=self.Main, Color=Color3.fromRGB(70,70,70), Thickness=1.5})
+
+	self.Main = create("Frame", { Parent = self.Gui, Size = mainSize, Position = mainPos, BackgroundColor3 = Color3.fromRGB(25,25,25), ClipsDescendants = true })
+	create("UICorner", { Parent = self.Main, CornerRadius = UDim.new(0,12) })
+	create("UIStroke", { Parent = self.Main, Color = Color3.fromRGB(70,70,70), Thickness = 1.5 })
 	self._OriginalSize = mainSize
 	self._Minimized = false
 
-	-- TopBar
-	self.TopBar = create("Frame",{Parent=self.Main, Size=UDim2.new(1,0,0,42), BackgroundColor3=theme.TopBar})
-	create("UICorner",{Parent=self.TopBar, CornerRadius=UDim.new(0,12)})
+	-- === Barra superior ===
+	local topBar = create("Frame", { Parent = self.Main, Size = UDim2.new(1,0,0,42), BackgroundColor3 = Color3.fromRGB(18,18,18), Name="TopBar" })
+	create("UICorner", { Parent = topBar, CornerRadius = UDim.new(0,12) })
 
-	-- Close button
-	self.CloseBtn = create("TextButton",{
-		Parent = self.TopBar,
-		Size = UDim2.new(0,30,0,30),
-		Position = UDim2.new(1,-35,0,6),
-		BackgroundColor3 = theme.CloseButton,
-		Text = "X",
-		TextColor3 = Color3.fromRGB(255,255,255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 18
-	})
-	create("UICorner",{Parent=self.CloseBtn, CornerRadius=UDim.new(0,4)})
-	self.CloseBtn.MouseButton1Click:Connect(function()
-		self:Close()
-	end)
+	create("TextLabel", { Parent = topBar, Text = title or "SawMillHub", Size = UDim2.new(1,-80,1,0), Position=UDim2.new(0,12,0,0), TextColor3=Color3.new(1,1,1), BackgroundTransparency=1, TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.GothamBold, TextSize=18 })
 
-	-- Minimize button
-	self.MinimizeBtn = create("TextButton",{
-		Parent = self.TopBar,
-		Size = UDim2.new(0,30,0,30),
-		Position = UDim2.new(1,-70,0,6),
-		BackgroundColor3 = theme.MinimizeButton,
-		Text = "_",
-		TextColor3 = Color3.fromRGB(0,0,0),
-		Font = Enum.Font.GothamBold,
-		TextSize = 18
-	})
-	create("UICorner",{Parent=self.MinimizeBtn, CornerRadius=UDim.new(0,4)})
-	self.MinimizeBtn.MouseButton1Click:Connect(function()
-		self:ToggleMinimize()
-	end)
+	-- Botões minimizar e fechar
+	local minimizeButton = create("TextButton", { Parent = topBar, Text="-", Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-44,0.5,0), BackgroundColor3=Color3.fromRGB(255,190,60), TextColor3=Color3.fromRGB(0,0,0), Font=Enum.Font.GothamBold, TextSize=24, AutoButtonColor=false, ZIndex=2 })
+	create("UICorner", { Parent=minimizeButton, CornerRadius=UDim.new(0,8) })
+	minimizeButton.MouseButton1Click:Connect(function() self:ToggleMinimize() end)
 
-	-- Sidebar
-	self.Sidebar = create("Frame",{Parent=self.Main, Size=UDim2.new(0,140,1,-42), Position=UDim2.new(0,0,0,42), BackgroundColor3=theme.Sidebar})
-	create("UICorner",{Parent=self.Sidebar, CornerRadius=UDim.new(0,8)})
+	local closeButton = create("TextButton", { Parent = topBar, Text="X", Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-6,0.5,0), BackgroundColor3=Color3.fromRGB(255,60,60), TextColor3=Color3.fromRGB(255,255,255), Font=Enum.Font.GothamBold, TextSize=20, AutoButtonColor=false, ZIndex=2 })
+	create("UICorner", { Parent=closeButton, CornerRadius=UDim.new(0,8) })
+	closeButton.MouseButton1Click:Connect(function() self:Close() end)
 
-	-- TabHolder
-	self.TabHolder = create("Frame",{Parent=self.Main, Size=UDim2.new(1,-140,1,-42), Position=UDim2.new(0,140,0,42), BackgroundColor3=theme.TabHolder})
-	create("UICorner",{Parent=self.TabHolder, CornerRadius=UDim.new(0,8)})
+	-- === Layout interno ===
+	self.Sidebar = create("Frame", { Parent=self.Main, Size=UDim2.new(0,140,1,-42), Position=UDim2.new(0,0,0,42), BackgroundColor3=Color3.fromRGB(18,18,18) })
+	create("UICorner", { Parent=self.Sidebar, CornerRadius=UDim.new(0,8) })
 
-	enableDragging(self.TopBar, self.Main, dragSpeed)
+	self.TabHolder = create("Frame", { Parent=self.Main, Size=UDim2.new(1,-140,1,-42), Position=UDim2.new(0,140,0,42), BackgroundColor3=Color3.fromRGB(32,32,32) })
+	create("UICorner", { Parent=self.TabHolder, CornerRadius=UDim.new(0,8) })
+
+	self.Tabs = {}
+	self.Keybinds = {}
+	self.Notifs = {}
+	self.MaxNotifs = 5
+
+	-- === Ativa arraste apenas na barra superior ===
+	enableDragging(topBar, self.Main, dragSpeed)
 
 	return self
-end
-
--- =========================
--- Fechar Hub
--- =========================
-function SawMillHub:Close()
-	if not self.Gui or self._IsClosing then return end
-	self._IsClosing = true
-	if self.OnClose then pcall(function() self.OnClose:Fire() end) end
-	self.Gui:Destroy()
-	self._IsClosing = false
-end
-
--- =========================
--- Minimizar/Restaurar
--- =========================
-function SawMillHub:ToggleMinimize()
-	if self._Minimized then
-		self.Main.Size = self._OriginalSize
-		self._Minimized = false
-	else
-		self.Main.Size = UDim2.new(self._OriginalSize.X.Scale,self._OriginalSize.X.Offset,0,42)
-		self._Minimized = true
-	end
 end
 
 -----------------------------------------------------
