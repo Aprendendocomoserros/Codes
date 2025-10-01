@@ -751,7 +751,6 @@ function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callba
 end
 
 function SawMillHub:CreateDropdown(tab, text, options, callback)
-	-- Garante acesso direto aos serviços e variáveis do módulo
 	local TweenService = game:GetService("TweenService")
 	local NEON_BLUE = Color3.fromRGB(0, 170, 255)
 
@@ -765,8 +764,8 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local optionBackground = Color3.fromRGB(35, 35, 35)
 	local optionHover = Color3.fromRGB(50, 50, 50)
 
-	local selectedValue = nil -- Variável para armazenar o valor selecionado
-	local optionMap = {} -- Mapeamento para acessar as opções por nome
+	local selectedValue = nil
+	local optionMap = {} -- Guarda todos os botões/opções
 
 	-- CONTAINER PRINCIPAL
 	local frame = create("Frame", {
@@ -777,7 +776,6 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	})
 	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 14) })
 
-	-- UIStroke inicial sutil para borda
 	local mainStroke = create("UIStroke", {
 		Parent = frame,
 		Color = Color3.fromRGB(70, 70, 70),
@@ -785,7 +783,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		Transparency = 0.5
 	})
 
-	-- BOTÃO PRINCIPAL (HEADER)
+	-- BOTÃO PRINCIPAL
 	local btn = create("TextButton", {
 		Parent = frame,
 		Text = "",
@@ -796,7 +794,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 
 	local btnLabel = create("TextLabel", {
 		Parent = btn,
-		Text = text,
+		Text = text .. ": (Selecione)",
 		Size = UDim2.new(1, -60, 1, 0),
 		Position = UDim2.new(0, 14, 0, 0),
 		BackgroundTransparency = 1,
@@ -806,7 +804,6 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
-	-- SETA MAIOR + ANIMAÇÃO DE ROTAÇÃO
 	local arrow = create("TextLabel", {
 		Parent = btn,
 		Text = "▼",
@@ -820,13 +817,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		ZIndex = 2
 	})
 
-	-- Efeito de HOVER no botão principal
-	btn.MouseEnter:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.2), { BackgroundColor3 = selectedBackground }):Play()
-	end)
-	btn.MouseLeave:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.3), { BackgroundColor3 = darkBackground }):Play()
-	end)
+	-- LISTA DE OPÇÕES
 	local listHeight = #options * 38 + 8
 	local list = create("Frame", {
 		Parent = frame,
@@ -840,9 +831,10 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	create("UIListLayout", { Parent = list, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
 	create("UIPadding", { Parent = list, PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
 
-
 	local open = false
 	local selectedCheck = nil
+
+	-- Toggle abrir/fechar
 	local function toggleDropdown()
 		open = not open
 		list.Visible = true
@@ -865,30 +857,28 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	end
 
 	btn.MouseButton1Click:Connect(toggleDropdown)
+
+	-- Selecionar opção
 	local function selectOption(opt)
 		if selectedCheck then selectedCheck.Visible = false end
-
 		local item = optionMap[opt]
 		if not item then return end
 
-		local check = item.Check
-
-		check.Visible = true
-		selectedCheck = check
+		item.Check.Visible = true
+		selectedCheck = item.Check
 		selectedValue = opt
-
 		btnLabel.Text = text .. ": " .. opt
+
 		TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play()
 		task.delay(0.5, function()
 			TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
 		end)
 		if callback then pcall(callback, opt) end
 	end
-	local function handleOptionClick(opt)
-		selectOption(opt)
-		toggleDropdown()
-	end
-	for _, opt in ipairs(options) do
+
+	-- Criar uma opção
+	local function createOption(opt)
+		if optionMap[opt] then return end
 		local optBtn = create("TextButton", {
 			Parent = list,
 			Text = "",
@@ -909,6 +899,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Left
 		})
+
 		local check = create("TextLabel", {
 			Parent = optBtn,
 			Text = "✓",
@@ -921,26 +912,67 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			TextSize = 22,
 			Visible = false
 		})
+
 		optionMap[opt] = {
 			Button = optBtn,
-			Check = check,
-			Callback = function() handleOptionClick(opt) end
+			Check = check
 		}
+
 		optBtn.MouseEnter:Connect(function()
 			TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = optionHover}):Play()
 		end)
 		optBtn.MouseLeave:Connect(function()
 			TweenService:Create(optBtn, TweenInfo.new(0.2), {BackgroundColor3 = optionBackground}):Play()
 		end)
-		optBtn.MouseButton1Click:Connect(optionMap[opt].Callback)
+		optBtn.MouseButton1Click:Connect(function()
+			selectOption(opt)
+			toggleDropdown()
+		end)
 	end
-	btnLabel.Text = text .. ": (Selecione)"
+
+	-- Remover opção
+	local function removeOption(opt)
+		local item = optionMap[opt]
+		if item then
+			item.Button:Destroy()
+			optionMap[opt] = nil
+			if selectedValue == opt then
+				selectedValue = nil
+				btnLabel.Text = text .. ": (Selecione)"
+			end
+		end
+	end
+
+	-- Setar lista de opções do zero
+	local function setOptions(newOptions)
+		for opt, item in pairs(optionMap) do
+			item.Button:Destroy()
+		end
+		optionMap = {}
+		options = newOptions
+		listHeight = #options * 38 + 8
+		list.Size = UDim2.new(1, 0, 0, listHeight)
+		for _, opt in ipairs(options) do
+			createOption(opt)
+		end
+		btnLabel.Text = text .. ": (Selecione)"
+		selectedValue = nil
+	end
+
+	-- Inicializar
+	for _, opt in ipairs(options) do
+		createOption(opt)
+	end
 
 	self:UpdateScrolling(tab)
+
 	return {
 		Frame = frame,
 		Get = function() return selectedValue end,
-		Set = function(_, optionName) selectOption(optionName) end
+		Set = function(_, optionName) selectOption(optionName) end,
+		AddOption = function(_, optionName) createOption(optionName) end,
+		RemoveOption = function(_, optionName) removeOption(optionName) end,
+		SetOptions = function(_, newOptions) setOptions(newOptions) end
 	}
 end
 
