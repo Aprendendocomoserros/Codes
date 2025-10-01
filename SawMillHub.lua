@@ -792,15 +792,13 @@ end
 function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local TweenService = game:GetService("TweenService")
 	local NEON_BLUE = Color3.fromRGB(0, 170, 255)
-
 	if not self.Tabs[tab] then return end
 	options = options or {}
 
 	local neonBlue = NEON_BLUE
-	local darkBackground = Color3.fromRGB(25, 25, 25)
-	local selectedBackground = Color3.fromRGB(45, 45, 45)
-	local optionBackground = Color3.fromRGB(35, 35, 35)
-	local optionHover = Color3.fromRGB(50, 50, 50)
+	local darkBackground = Color3.fromRGB(25,25,25)
+	local optionBackground = Color3.fromRGB(35,35,35)
+	local optionHover = Color3.fromRGB(50,50,50)
 
 	local selectedValue = nil
 	local optionMap = {}
@@ -811,107 +809,59 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		BackgroundColor3 = darkBackground,
 		ClipsDescendants = true
 	})
-	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 14) })
-	create("UIStroke", { Parent = frame, Color = Color3.fromRGB(70, 70, 70), Thickness = 1, Transparency = 0.5 })
+	create("UICorner", {Parent=frame, CornerRadius=UDim.new(0,14)})
+	create("UIStroke",{Parent=frame,Color=Color3.fromRGB(70,70,70),Thickness=1,Transparency=0.5})
 
-	local btn = create("TextButton", {
-		Parent = frame,
-		Text = "",
-		Size = UDim2.new(1, 0, 0, 50),
-		BackgroundTransparency = 1,
-		AutoButtonColor = false
-	})
+	local btn = create("TextButton", {Parent=frame, Text="", Size=UDim2.new(1,0,0,50), BackgroundTransparency=1, AutoButtonColor=false})
+	local btnLabel = create("TextLabel", {Parent=btn, Text=text.." : (Selecione)", Size=UDim2.new(1,-60,1,0), Position=UDim2.new(0,14,0,0), BackgroundTransparency=1, TextColor3=Color3.fromRGB(255,255,255), Font=Enum.Font.GothamBold, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left})
+	local arrow = create("TextLabel", {Parent=btn, Text="▼", Size=UDim2.new(0,30,0,30), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-14,0.5,0), BackgroundTransparency=1, TextColor3=neonBlue, Font=Enum.Font.GothamBlack, TextSize=25, ZIndex=2})
 
-	local btnLabel = create("TextLabel", {
-		Parent = btn,
-		Text = text .. ": (Selecione)",
-		Size = UDim2.new(1, -60, 1, 0),
-		Position = UDim2.new(0, 14, 0, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 16,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
-
-	local arrow = create("TextLabel", {
-		Parent = btn,
-		Text = "▼",
-		Size = UDim2.new(0, 30, 0, 30),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -14, 0.5, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = neonBlue,
-		Font = Enum.Font.GothamBlack,
-		TextSize = 25,
-		ZIndex = 2
-	})
-
-	-- Se tiver muitas opções, usa ScrollingFrame
-	local useScroll = #options > 6
-	local listHeight = math.min(#options, 6) * 38 + 8
-
-	local list
-	if useScroll then
-		list = create("ScrollingFrame", {
-			Parent = frame,
-			Size = UDim2.new(1, 0, 0, listHeight),
-			Position = UDim2.new(0, 0, 0, 50),
-			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-			Visible = false,
-			CanvasSize = UDim2.new(0,0,0,0),
-			ScrollBarThickness = 6
-		})
-	else
-		list = create("Frame", {
-			Parent = frame,
-			Size = UDim2.new(1, 0, 0, listHeight),
-			Position = UDim2.new(0, 0, 0, 50),
-			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-			Visible = false
-		})
-	end
-
-	create("UICorner", { Parent = list, CornerRadius = UDim.new(0, 14) })
-	create("UIStroke", { Parent = list, Color = neonBlue, Thickness = 1.2, Transparency = 1 })
-	local layout = create("UIListLayout", { Parent = list, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
-	create("UIPadding", { Parent = list, PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
+	-- Lista inicial
+	local list = create("Frame", {Parent=frame, Size=UDim2.new(1,0,0,0), Position=UDim2.new(0,0,0,50), BackgroundColor3=Color3.fromRGB(20,20,20), Visible=false})
+	create("UICorner",{Parent=list, CornerRadius=UDim.new(0,14)})
+	create("UIStroke",{Parent=list, Color=neonBlue, Thickness=1.2, Transparency=1})
+	local layout = create("UIListLayout",{Parent=list, SortOrder=Enum.SortOrder.LayoutOrder, Padding=UDim.new(0,4)})
+	create("UIPadding",{Parent=list, PaddingTop=UDim.new(0,4), PaddingBottom=UDim.new(0,4), PaddingLeft=UDim.new(0,5), PaddingRight=UDim.new(0,5)})
 
 	local open = false
 	local selectedCheck = nil
-
 	local function toggleDropdown()
 		open = not open
 		list.Visible = true
-		TweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Rotation = open and 180 or 0}):Play()
-		TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = open and UDim2.new(1, -10, 0, 50 + listHeight) or UDim2.new(1, -10, 0, 50)}):Play()
+		local totalHeight = layout.AbsoluteContentSize.Y + 8
+		local screenHeight = workspace.CurrentCamera.ViewportSize.Y
+		-- detecta se o totalHeight excede a tela e ativa scrolling
+		local maxHeight = math.min(totalHeight, screenHeight * 0.5) -- metade da tela no máximo
+		list.Size = UDim2.new(1,0,0,maxHeight)
+
+		TweenService:Create(arrow, TweenInfo.new(0.3,Enum.EasingStyle.Cubic,Enum.EasingDirection.Out),{Rotation=open and 180 or 0}):Play()
+		TweenService:Create(frame, TweenInfo.new(0.4,Enum.EasingStyle.Cubic,Enum.EasingDirection.Out),{Size=open and UDim2.new(1,-10,0,50+maxHeight) or UDim2.new(1,-10,0,50)}):Play()
 		if not open then
-			task.delay(0.4, function() if not open then list.Visible = false end end)
+			task.delay(0.4,function() if not open then list.Visible=false end end)
 		end
 		self:UpdateScrolling(tab)
 	end
-
 	btn.MouseButton1Click:Connect(toggleDropdown)
 
 	local function selectOption(opt)
-		if selectedCheck then selectedCheck.Visible = false end
+		if selectedCheck then selectedCheck.Visible=false end
 		local item = optionMap[opt]
 		if not item then return end
-		item.Check.Visible = true
-		selectedCheck = item.Check
-		selectedValue = opt
-		btnLabel.Text = text .. ": " .. opt
-		if callback then pcall(callback, opt) end
+		item.Check.Visible=true
+		selectedCheck=item.Check
+		selectedValue=opt
+		btnLabel.Text=text.." : "..opt
+		if callback then pcall(callback,opt) end
 	end
 
 	local function createOption(opt)
 		if optionMap[opt] then return end
-		local optBtn = create("TextButton", {Parent=list, Text="", Size=UDim2.new(1, -10, 0, 34), BackgroundColor3=optionBackground, AutoButtonColor=false})
-		create("UICorner", {Parent=optBtn, CornerRadius=UDim.new(0, 8)})
-		local lbl = create("TextLabel", {Parent=optBtn, Text=opt, Size=UDim2.new(1,-50,1,0), Position=UDim2.new(0,12,0,0), BackgroundTransparency=1, TextColor3=Color3.fromRGB(230,230,230), Font=Enum.Font.Gotham, TextSize=15, TextXAlignment=Enum.TextXAlignment.Left})
-		local check = create("TextLabel", {Parent=optBtn, Text="✓", Size=UDim2.new(0,24,0,24), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-12,0.5,0), BackgroundTransparency=1, TextColor3=neonBlue, Font=Enum.Font.GothamBlack, TextSize=22, Visible=false})
-
+		local optBtn = create("TextButton",{Parent=list,Text="", Size=UDim2.new(1,-10,0,34), BackgroundColor3=optionBackground, AutoButtonColor=false})
+		create("UICorner",{Parent=optBtn, CornerRadius=UDim.new(0,8)})
+		local lbl = create("TextLabel",{Parent=optBtn,Text=opt, Size=UDim2.new(1,-50,1,0), Position=UDim2.new(0,12,0,0), BackgroundTransparency=1, TextColor3=Color3.fromRGB(230,230,230), Font=Enum.Font.Gotham, TextSize=15, TextXAlignment=Enum.TextXAlignment.Left})
+		local check = create("TextLabel",{Parent=optBtn, Text="✓", Size=UDim2.new(0,24,0,24), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-12,0.5,0), BackgroundTransparency=1, TextColor3=neonBlue, Font=Enum.Font.GothamBlack, TextSize=22, Visible=false})
 		optionMap[opt] = {Button=optBtn, Check=check}
+
 		optBtn.MouseEnter:Connect(function() TweenService:Create(optBtn,TweenInfo.new(0.15),{BackgroundColor3=optionHover}):Play() end)
 		optBtn.MouseLeave:Connect(function() TweenService:Create(optBtn,TweenInfo.new(0.2),{BackgroundColor3=optionBackground}):Play() end)
 		optBtn.MouseButton1Click:Connect(function() selectOption(opt); toggleDropdown() end)
@@ -919,33 +869,28 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 
 	for _, opt in ipairs(options) do createOption(opt) end
 
-	-- Ajusta CanvasSize se for ScrollingFrame
-	if useScroll then
-		task.spawn(function()
-			task.wait(0.05)
-			local totalHeight = layout.AbsoluteContentSize.Y + 8
-			list.CanvasSize = UDim2.new(0,0,0,totalHeight)
-		end)
-	end
+	-- Atualiza CanvasSize dinamicamente
+	task.spawn(function()
+		task.wait(0.05)
+		list.Size=UDim2.new(1,0,0,math.min(layout.AbsoluteContentSize.Y+8, workspace.CurrentCamera.ViewportSize.Y*0.5))
+	end)
 
 	self:UpdateScrolling(tab)
 
 	return {
-		Frame = frame,
-		Get = function() return selectedValue end,
-		Set = function(_, optionName) selectOption(optionName) end,
-		AddOption = function(_, optionName) createOption(optionName); if useScroll then list.CanvasSize=UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+8) end end,
-		RemoveOption = function(_, optionName) local item=optionMap[optionName]; if item then item.Button:Destroy(); optionMap[optionName]=nil end; if useScroll then list.CanvasSize=UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+8) end end,
-		SetOptions = function(_, newOptions)
+		Frame=frame,
+		Get=function() return selectedValue end,
+		Set=function(_, optionName) selectOption(optionName) end,
+		AddOption=function(_, optionName) createOption(optionName); list.Size=UDim2.new(1,0,0,math.min(layout.AbsoluteContentSize.Y+8, workspace.CurrentCamera.ViewportSize.Y*0.5)) end,
+		RemoveOption=function(_, optionName) local item=optionMap[optionName]; if item then item.Button:Destroy(); optionMap[optionName]=nil end; list.Size=UDim2.new(1,0,0,math.min(layout.AbsoluteContentSize.Y+8, workspace.CurrentCamera.ViewportSize.Y*0.5)) end,
+		SetOptions=function(_, newOptions)
 			for _, item in pairs(optionMap) do item.Button:Destroy() end
-			optionMap = {}
-			options = newOptions
-			listHeight = math.min(#options,6)*38+8
-			list.Size = UDim2.new(1,0,0,listHeight)
+			optionMap={}
+			options=newOptions
 			for _, opt in ipairs(options) do createOption(opt) end
-			selectedValue = nil
+			selectedValue=nil
 			btnLabel.Text=text.." : (Selecione)"
-			if useScroll then list.CanvasSize=UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+8) end
+			list.Size=UDim2.new(1,0,0,math.min(layout.AbsoluteContentSize.Y+8, workspace.CurrentCamera.ViewportSize.Y*0.5))
 		end
 	}
 end
