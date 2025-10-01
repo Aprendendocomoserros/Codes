@@ -796,7 +796,6 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	if not self.Tabs[tab] then return end
 	options = options or {}
 
-	-- Definição de Cores
 	local neonBlue = NEON_BLUE
 	local darkBackground = Color3.fromRGB(25, 25, 25)
 	local selectedBackground = Color3.fromRGB(45, 45, 45)
@@ -804,7 +803,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local optionHover = Color3.fromRGB(50, 50, 50)
 
 	local selectedValue = nil
-	local optionMap = {} -- Guarda todos os botões/opções
+	local optionMap = {}
 
 	-- CONTAINER PRINCIPAL
 	local frame = create("Frame", {
@@ -856,14 +855,17 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		ZIndex = 2
 	})
 
-	-- LISTA DE OPÇÕES
+	-- LISTA DE OPÇÕES (ScrollingFrame)
 	local listHeight = #options * 38 + 8
-	local list = create("Frame", {
+	local list = create("ScrollingFrame", {
 		Parent = frame,
 		Size = UDim2.new(1, 0, 0, listHeight),
 		Position = UDim2.new(0, 0, 0, 50),
 		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		Visible = false
+		Visible = false,
+		ScrollBarThickness = 6,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y
 	})
 	create("UICorner", { Parent = list, CornerRadius = UDim.new(0, 14) })
 	local listStroke = create("UIStroke", { Parent = list, Color = neonBlue, Thickness = 1.2, Transparency = 1 })
@@ -892,7 +894,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			end)
 		end
 
-		self:UpdateScrolling(tab)
+		self:UpdateScrolling(self.Tabs[tab])
 	end
 
 	btn.MouseButton1Click:Connect(toggleDropdown)
@@ -952,10 +954,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			Visible = false
 		})
 
-		optionMap[opt] = {
-			Button = optBtn,
-			Check = check
-		}
+		optionMap[opt] = { Button = optBtn, Check = check }
 
 		optBtn.MouseEnter:Connect(function()
 			TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = optionHover}):Play()
@@ -967,6 +966,9 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			selectOption(opt)
 			toggleDropdown()
 		end)
+
+		-- Atualiza scroll
+		self:UpdateScrolling(self.Tabs[tab])
 	end
 
 	-- Remover opção
@@ -979,6 +981,9 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 				selectedValue = nil
 				btnLabel.Text = text .. ": (Selecione)"
 			end
+
+			-- Atualiza scroll
+			self:UpdateScrolling(self.Tabs[tab])
 		end
 	end
 
@@ -996,6 +1001,8 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		end
 		btnLabel.Text = text .. ": (Selecione)"
 		selectedValue = nil
+
+		self:UpdateScrolling(self.Tabs[tab])
 	end
 
 	-- Inicializar
@@ -1003,7 +1010,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		createOption(opt)
 	end
 
-	self:UpdateScrolling(tab)
+	self:UpdateScrolling(self.Tabs[tab])
 
 	return {
 		Frame = frame,
