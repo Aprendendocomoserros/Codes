@@ -263,16 +263,55 @@ function SawMillHub:UpdateScrolling(tabName)
 	local tab = (type(tabName) == "table" and tabName) or self.Tabs[tabName]
 	if not tab or not tab.Container then return end
 
-	local layout = tab.Container:FindFirstChildOfClass("UIListLayout")
-	if not layout then return end
+	local container = tab.Container
+	-- só funciona pra ScrollingFrame (evita erros se o container mudou)
+	if not container:IsA("ScrollingFrame") then return end
 
-	local total = 0
-	for _, child in ipairs(tab.Container:GetChildren()) do
-		if child:IsA("GuiObject") and child.Visible then
-			total = total + child.Size.Y.Offset + layout.Padding.Offset
-		end
+	local layout = container:FindFirstChildOfClass("UIListLayout")
+	local padding = container:FindFirstChildOfClass("UIPadding")
+	local topPad = 0
+	local bottomPad = 0
+	if padding then
+		topPad = padding.PaddingTop.Offset or 0
+		bottomPad = padding.PaddingBottom.Offset or 0
 	end
-	tab.Container.CanvasSize = UDim2.new(0, 0, 0, total + 10)
+
+	local function applyCanvas(y)
+		-- garante número inteiro seguro e pelo menos o tamanho do frame visível
+		local finalY = math.max(0, math.floor(y + 0.5))
+		container.CanvasSize = UDim2.new(0, 0, 0, finalY)
+	end
+
+	if layout then
+		-- espera curto para deixar o layout recalcular (se necessário)
+		-- tenta algumas verificações rápidas; normalmente 1-2 frames bastam
+		for i = 1, 3 do
+			if layout.AbsoluteContentSize.Y > 0 then break end
+			task.wait(0) -- yield 1 frame
+		end
+
+		local absY = layout.AbsoluteContentSize.Y or 0
+		local canvasY = absY + topPad + bottomPad + 8 -- folga extra
+		applyCanvas(canvasY)
+	else
+		-- fallback: soma filhos visíveis (usa AbsoluteSize quando disponível)
+		-- espera um frame pra garantir AbsoluteSize atualizado
+		task.wait(0)
+		local total = 0
+		for _, child in ipairs(container:GetChildren()) do
+			if child:IsA("GuiObject") and child.Visible then
+				local h = 0
+				-- prefere AbsoluteSize (mais confiável depois do layout)
+				if child.AbsoluteSize and child.AbsoluteSize.Y and child.AbsoluteSize.Y > 0 then
+					h = child.AbsoluteSize.Y
+				elseif child.Size and child.Size.Y and child.Size.Y.Offset then
+					h = child.Size.Y.Offset
+				end
+				total = total + h
+			end
+		end
+		applyCanvas(total + topPad + bottomPad + 8)
+	end
 end
 
 -- Label (Simplificado: Removido 'initialContent')
