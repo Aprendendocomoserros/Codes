@@ -1,35 +1,97 @@
+-- SawMillHub.lua (LocalScript)
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
-local CoreGui = LocalPlayer:WaitForChild("PlayerGui")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
+
+-- ======== FUNÇÕES AUXILIARES ========
 local function create(class, props)
 	local inst = Instance.new(class)
 	if props then
-		for k, v in pairs(props) do
-			pcall(function()
-				inst[k] = v
-			end)
+		for k,v in pairs(props) do
+			pcall(function() inst[k] = v end)
 		end
 	end
 	return inst
 end
+
+local function safePropertyExists(obj, propName)
+	local ok, _ = pcall(function() local _ = obj[propName] end)
+	return ok
+end
+
+local function tween(obj, time, props, style, direction)
+	style = style or Enum.EasingStyle.Quad
+	direction = direction or Enum.EasingDirection.Out
+	local ok, t = pcall(function()
+		return TweenService:Create(obj, TweenInfo.new(time, style, direction), props)
+	end)
+	if ok and t then t:Play() end
+end
+
+-- ======== DRAG & RESIZE ========
 local function enableDragging(topBar, mainFrame, dragSpeed)
 	if not topBar or not mainFrame then return end
 
-	local dragging = false
-	local dragStart, startPos
+	-- Redimensionamento manual
+	local resizeHandle = create("Frame", {
+		Parent = mainFrame,
+		Size = UDim2.new(0,16,0,16),
+		AnchorPoint = Vector2.new(1,1),
+		Position = UDim2.new(1,-3,1,-3),
+		BackgroundColor3 = Color3.fromRGB(80,80,80),
+		BackgroundTransparency = 0.4,
+		Name = "ResizeHandle",
+		ZIndex = 20
+	})
+	create("UICorner",{Parent=resizeHandle, CornerRadius=UDim.new(0,4)})
+	create("UIStroke",{Parent=resizeHandle, Color=Color3.fromRGB(130,130,130), Thickness=1.2})
 
-	local speed = 1
-	if dragSpeed == "Slow" then
-		speed = 0.2
-	elseif dragSpeed == "Default" then
-		speed = 1
-	end
+	local resizing = false
+	local startSize, startInputPos
+	resizeHandle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			resizing = true
+			startSize = mainFrame.Size
+			startInputPos = input.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then resizing = false end
+			end)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - startInputPos
+			local maxW = workspace.CurrentCamera.ViewportSize.X - 50
+			local maxH = workspace.CurrentCamera.ViewportSize.Y - 50
+			local newWidth = math.max(math.min(startSize.X.Offset + delta.X, maxW), 300)
+			local newHeight = math.max(math.min(startSize.Y.Offset + delta.Y, maxH), 200)
+			mainFrame.Size = UDim2.new(startSize.X.Scale, newWidth, startSize.Y.Scale, newHeight)
+		end
+	end)
+
+	-- Hover visual
+	resizeHandle.MouseEnter:Connect(function()
+		TweenService:Create(resizeHandle, TweenInfo.new(0.15), {BackgroundTransparency=0.2, BackgroundColor3=Color3.fromRGB(100,100,100)}):Play()
+	end)
+	resizeHandle.MouseLeave:Connect(function()
+		if not resizing then
+			TweenService:Create(resizeHandle, TweenInfo.new(0.15), {BackgroundTransparency=0.4, BackgroundColor3=Color3.fromRGB(80,80,80)}):Play()
+		end
+	end)
+
+	-- Arrastar
+	local dragging, dragStart, startPos
+	dragging = false
+	dragStart = false
+	startPos = false
+	local speed = dragSpeed == "Slow" and 0.2 or 1
 
 	topBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -37,9 +99,7 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 			dragStart = input.Position
 			startPos = mainFrame.Position
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
 			end)
 		end
 	end)
@@ -50,9 +110,7 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 				startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			if speed < 1 then
-				TweenService:Create(mainFrame, TweenInfo.new(speed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					Position = newPos
-				}):Play()
+				tween(mainFrame, speed, {Position=newPos})
 			else
 				mainFrame.Position = newPos
 			end
@@ -60,140 +118,123 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	end)
 end
 
--- Função para fechar o Hub
+-- ======== FECHAR HUB ========
 function SawMillHub:Close()
-	if not self.Gui or not self.Main then return end
-	if self._IsClosing then return end
+	if not self.Gui or not self.Main or self._IsClosing then return end
 	self._IsClosing = true
 
-	if self.OnClose then
-		pcall(function()
-			self.OnClose:Fire()
-		end)
-	end
+	pcall(function() self.OnClose:Fire() end)
 
-	local currentSize = self.Main.Size
-	local currentPos = self.Main.Position
+	tween(self.Main,0.28,{
+		Size=UDim2.new(self.Main.Size.X.Scale, math.max(2, math.floor(self.Main.Size.X.Offset*0.9)),
+			self.Main.Size.Y.Scale, math.max(2, math.floor(self.Main.Size.Y.Offset*0.9))),
+		BackgroundTransparency=1
+	})
 
-	TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Size = UDim2.new(currentSize.X.Scale, currentSize.X.Offset * 0.9,
-			currentSize.Y.Scale, currentSize.Y.Offset * 0.9),
-		Position = UDim2.new(currentPos.X.Scale, currentPos.X.Offset + currentSize.X.Offset * 0.05,
-			currentPos.Y.Scale, currentPos.Y.Offset + currentSize.Y.Offset * 0.05),
-		BackgroundTransparency = 1
-	}):Play()
-
-	for _, child in ipairs(self.Main:GetDescendants()) do
+	for _,child in ipairs(self.Main:GetDescendants()) do
 		if child:IsA("GuiObject") then
-			local properties = {}
-			if typeof(child.BackgroundTransparency) == "number" then
-				properties.BackgroundTransparency = 1
-			end
+			local props={}
+			if safePropertyExists(child,"BackgroundTransparency") then props.BackgroundTransparency=1 end
 			if (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox"))
-				and typeof(child.TextTransparency) == "number" then
-				properties.TextTransparency = 1
-			end
-			if (child:IsA("ImageLabel") or child:IsA("ImageButton"))
-				and typeof(child.ImageTransparency) == "number" then
-				properties.ImageTransparency = 1
-			end
-			if child:IsA("UIStroke") and typeof(child.Transparency) == "number" then
-				properties.Transparency = 1
-			end
-			if next(properties) then
-				TweenService:Create(child, TweenInfo.new(0.25), properties):Play()
-			end
+				and safePropertyExists(child,"TextTransparency") then props.TextTransparency=1 end
+			if (child:IsA("ImageLabel") or child:IsA("ImageButton")) and safePropertyExists(child,"ImageTransparency") then props.ImageTransparency=1 end
+			if child:IsA("UIStroke") and safePropertyExists(child,"Transparency") then props.Transparency=1 end
+			if next(props) then tween(child,0.22,props) end
 		end
 	end
 
-	task.delay(0.35, function()
-		if self.Gui and self.Gui.Parent then
-			self.Gui:Destroy()
-		end
-		self._IsClosing = false
+	task.delay(0.34,function()
+		if self.Gui and self.Gui.Parent then pcall(function() self.Gui:Destroy() end) end
+		self._IsClosing=false
 	end)
 end
 
--- Função para minimizar/restaurar o Hub
+-- ======== MINIMIZAR / RESTAURAR ========
 function SawMillHub:ToggleMinimize()
+	if not self.Main then return end
 	if self._Minimized then
-		TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = self._OriginalSize
-		}):Play()
-		self._Minimized = false
+		tween(self.Main,0.28,{Size=self._OriginalSize})
+		if self.MinimizeButton and self.MinimizeButton:IsA("TextButton") then
+			self.MinimizeButton.Text="–"
+			pcall(function() self.MinimizeButton.BackgroundColor3=Color3.fromRGB(255,190,60) end)
+		end
+		self._Minimized=false
 	else
-		local newSize = UDim2.new(self._OriginalSize.X.Scale, self._OriginalSize.X.Offset, 0, 42)
-		TweenService:Create(self.Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = newSize
-		}):Play()
-		self._Minimized = true
+		if not self._OriginalSize then self._OriginalSize=self.Main.Size end
+		local newSize=UDim2.new(self._OriginalSize.X.Scale,self._OriginalSize.X.Offset,0,42)
+		tween(self.Main,0.28,{Size=newSize})
+		if self.MinimizeButton and self.MinimizeButton:IsA("TextButton") then
+			self.MinimizeButton.Text="+" 
+			pcall(function() self.MinimizeButton.BackgroundColor3=Color3.fromRGB(0,170,255) end)
+		end
+		self._Minimized=true
 	end
 end
 
--- Construtor principal do Hub
+-- ======== CONSTRUTOR ========
 function SawMillHub.new(title, dragSpeed)
 	dragSpeed = dragSpeed or "Default"
-
 	local self = setmetatable({}, SawMillHub)
 	self.OnClose = Instance.new("BindableEvent")
 
-	self.Gui = create("ScreenGui", { Parent = CoreGui, ResetOnSpawn = false, Name = "SawMillHub" })
-	create("ObjectValue", { Parent = self.Gui, Name = "SawMillHubObject", Value = self, Archivable = false })
+	self.Gui = create("ScreenGui",{Name="SawMillHub", ResetOnSpawn=false, Parent=PlayerGui})
+	create("ObjectValue",{Parent=self.Gui, Name="SawMillHubObject", Value=self, Archivable=false})
 
-	self.Gui.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			pcall(function() self.OnClose:Fire() end)
+	-- Tamanho padrão inicial
+	local mainSize = UDim2.new(0,450,0,300)
+	local mainPos = UDim2.new(0.5,-mainSize.X.Offset/2,0.5,-mainSize.Y.Offset/2)
+
+	self.Main = create("Frame",{Parent=self.Gui, Size=mainSize, Position=mainPos, BackgroundColor3=Color3.fromRGB(28,28,28), ClipsDescendants=true, Name="Main"})
+	create("UICorner",{Parent=self.Main, CornerRadius=UDim.new(0,12)})
+	create("UIStroke",{Parent=self.Main, Color=Color3.fromRGB(90,90,90), Thickness=1.6})
+	self._OriginalSize = mainSize
+	self._Minimized=false
+
+	-- TopBar + botões
+	local topBar = create("Frame",{Parent=self.Main, Size=UDim2.new(1,0,0,42), BackgroundColor3=Color3.fromRGB(20,20,20), Name="TopBar"})
+	create("UICorner",{Parent=topBar, CornerRadius=UDim.new(0,12)})
+	local titleLabel = create("TextLabel",{Parent=topBar, Text=title or "SawMillHub", Size=UDim2.new(1,-110,1,0), Position=UDim2.new(0,12,0,0), TextColor3=Color3.fromRGB(245,245,245), BackgroundTransparency=1, TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.GothamBold, TextSize=18, Name="TitleLabel"})
+
+	-- Botões
+	local minimizeButton = create("TextButton",{Parent=topBar, Text="–", Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-44,0.5,0), BackgroundColor3=Color3.fromRGB(255,190,60), TextColor3=Color3.fromRGB(10,10,10), Font=Enum.Font.GothamBold, TextSize=24, AutoButtonColor=false, Name="MinimizeButton"})
+	create("UICorner",{Parent=minimizeButton, CornerRadius=UDim.new(0,8)})
+	minimizeButton.MouseButton1Click:Connect(function() self:ToggleMinimize() end)
+	self.MinimizeButton = minimizeButton
+
+	local closeButton = create("TextButton",{Parent=topBar, Text="X", Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-6,0.5,0), BackgroundColor3=Color3.fromRGB(235,75,75), TextColor3=Color3.fromRGB(255,255,255), Font=Enum.Font.GothamBold, TextSize=20, AutoButtonColor=false, Name="CloseButton"})
+	create("UICorner",{Parent=closeButton, CornerRadius=UDim.new(0,8)})
+	closeButton.MouseButton1Click:Connect(function() self:Close() end)
+
+	local resetButton = create("TextButton",{Parent=topBar, Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-82,0.5,0), BackgroundColor3=Color3.fromRGB(90,170,255), Text="R", TextColor3=Color3.fromRGB(10,10,10), Font=Enum.Font.GothamBold, TextSize=20, AutoButtonColor=false, Name="ResetButton"})
+	create("UICorner",{Parent=resetButton, CornerRadius=UDim.new(0,8)})
+	resetButton.MouseButton1Click:Connect(function()
+		if self._Minimized then
+			self.Main.Position = mainPos
+		else
+			tween(self.Main,0.35,{Size=mainSize,Position=mainPos})
+			self._OriginalSize = mainSize
 		end
 	end)
 
-	-- === Detecta celular ===
-	local isTouch = UserInputService.TouchEnabled
-
-	-- === Layout principal ===
-	local mainSize = isTouch and UDim2.new(0, 450, 0, 320) or UDim2.new(0, 560, 0, 400)
-	local mainPos = UDim2.new(0.5, -mainSize.X.Offset/2, 0.5, -mainSize.Y.Offset/2)
-
-	self.Main = create("Frame", { Parent = self.Gui, Size = mainSize, Position = mainPos, BackgroundColor3 = Color3.fromRGB(25,25,25), ClipsDescendants = true })
-	create("UICorner", { Parent = self.Main, CornerRadius = UDim.new(0,12) })
-	create("UIStroke", { Parent = self.Main, Color = Color3.fromRGB(70,70,70), Thickness = 1.5 })
-	self._OriginalSize = mainSize
-	self._Minimized = false
-
-	-- === Barra superior ===
-	local topBar = create("Frame", { Parent = self.Main, Size = UDim2.new(1,0,0,42), BackgroundColor3 = Color3.fromRGB(18,18,18), Name="TopBar" })
-	create("UICorner", { Parent = topBar, CornerRadius = UDim.new(0,12) })
-
-	create("TextLabel", { Parent = topBar, Text = title or "SawMillHub", Size = UDim2.new(1,-80,1,0), Position=UDim2.new(0,12,0,0), TextColor3=Color3.new(1,1,1), BackgroundTransparency=1, TextXAlignment=Enum.TextXAlignment.Left, Font=Enum.Font.GothamBold, TextSize=18 })
-
-	-- Botões minimizar e fechar
-	local minimizeButton = create("TextButton", { Parent = topBar, Text="-", Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-44,0.5,0), BackgroundColor3=Color3.fromRGB(255,190,60), TextColor3=Color3.fromRGB(0,0,0), Font=Enum.Font.GothamBold, TextSize=24, AutoButtonColor=false, ZIndex=2 })
-	create("UICorner", { Parent=minimizeButton, CornerRadius=UDim.new(0,8) })
-	minimizeButton.MouseButton1Click:Connect(function() self:ToggleMinimize() end)
-
-	local closeButton = create("TextButton", { Parent = topBar, Text="X", Size=UDim2.new(0,32,0,32), AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-6,0.5,0), BackgroundColor3=Color3.fromRGB(255,60,60), TextColor3=Color3.fromRGB(255,255,255), Font=Enum.Font.GothamBold, TextSize=20, AutoButtonColor=false, ZIndex=2 })
-	create("UICorner", { Parent=closeButton, CornerRadius=UDim.new(0,8) })
-	closeButton.MouseButton1Click:Connect(function() self:Close() end)
-
-	-- === Layout interno ===
-	self.Sidebar = create("Frame", { Parent=self.Main, Size=UDim2.new(0,140,1,-42), Position=UDim2.new(0,0,0,42), BackgroundColor3=Color3.fromRGB(18,18,18) })
-	create("UICorner", { Parent=self.Sidebar, CornerRadius=UDim.new(0,8) })
-
-	self.TabHolder = create("Frame", { Parent=self.Main, Size=UDim2.new(1,-140,1,-42), Position=UDim2.new(0,140,0,42), BackgroundColor3=Color3.fromRGB(32,32,32) })
-	create("UICorner", { Parent=self.TabHolder, CornerRadius=UDim.new(0,8) })
+	-- Sidebar e TabHolder
+	self.Sidebar = create("Frame",{Parent=self.Main, Size=UDim2.new(0,140,1,-42), Position=UDim2.new(0,0,0,42), BackgroundColor3=Color3.fromRGB(22,22,22), Name="Sidebar"})
+	create("UICorner",{Parent=self.Sidebar, CornerRadius=UDim.new(0,8)})
+	self.TabHolder = create("Frame",{Parent=self.Main, Size=UDim2.new(1,-140,1,-42), Position=UDim2.new(0,140,0,42), BackgroundColor3=Color3.fromRGB(35,35,35), Name="TabHolder"})
+	create("UICorner",{Parent=self.TabHolder, CornerRadius=UDim.new(0,8)})
 
 	self.Tabs = {}
 	self.Keybinds = {}
 	self.Notifs = {}
 	self.MaxNotifs = 5
 
-	-- === Ativa arraste apenas na barra superior ===
-	enableDragging(topBar, self.Main, dragSpeed)
+	-- Ativa drag e resize
+	enableDragging(topBar,self.Main,dragSpeed)
 
 	return self
 end
 
 -----------------------------------------------------
--- Criar Tab com scroll automático e hover suave
+-- ======== TABS & SCROLL ========
 -----------------------------------------------------
 function SawMillHub:CreateTab(tabName, icon)
 	if not self.TabScroll then
@@ -204,22 +245,39 @@ function SawMillHub:CreateTab(tabName, icon)
 			BorderSizePixel = 0,
 			ScrollBarThickness = 4,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y
 		})
-		local layout = create("UIListLayout", { Parent = scroll, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) })
-		create("UIPadding", { Parent = scroll, PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) })
+
+		local layout = create("UIListLayout", {
+			Parent = scroll,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6),
+			HorizontalAlignment = Enum.HorizontalAlignment.Center
+		})
+
+		create("UIPadding", {
+			Parent = scroll,
+			PaddingTop = UDim.new(0, 6),
+			PaddingBottom = UDim.new(0, 6),
+			PaddingLeft = UDim.new(0, 6),
+			PaddingRight = UDim.new(0, 6)
+		})
+
 		self.TabScroll = scroll
 	end
 
 	local btn = create("TextButton", {
 		Parent = self.TabScroll,
-		Text = (icon and icon.." " or "") .. tabName,
+		Text = (icon and icon .. " " or "") .. tabName,
 		Size = UDim2.new(1, -10, 0, 34),
 		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 		TextColor3 = Color3.new(1, 1, 1),
-		Font = Enum.Font.GothamSemibold,
-		TextSize = 14
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		AutoButtonColor = false
 	})
+
 	create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 8) })
 
 	local cont = create("ScrollingFrame", {
@@ -231,428 +289,106 @@ function SawMillHub:CreateTab(tabName, icon)
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y
 	})
-	create("UIListLayout", { Parent = cont, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) })
-	create("UIPadding", { Parent = cont, PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) })
+
+	create("UIListLayout", {
+		Parent = cont,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6)
+	})
+
+	create("UIPadding", {
+		Parent = cont,
+		PaddingTop = UDim.new(0, 6),
+		PaddingLeft = UDim.new(0, 6),
+		PaddingRight = UDim.new(0, 6),
+		PaddingBottom = UDim.new(0, 6)
+	})
 
 	local tab = { Name = tabName, Button = btn, Container = cont }
 	self.Tabs[tabName] = tab
 
+	-- Hover suave com Tween
+	btn.MouseEnter:Connect(function()
+		if self.CurrentTab ~= tab then
+			tween(btn, 0.25, { BackgroundColor3 = Color3.fromRGB(55, 55, 55) })
+		end
+	end)
+
+	btn.MouseLeave:Connect(function()
+		if self.CurrentTab ~= tab then
+			tween(btn, 0.25, { BackgroundColor3 = Color3.fromRGB(40, 40, 40) })
+		end
+	end)
+
+	-- Clique para trocar de aba
 	btn.MouseButton1Click:Connect(function()
 		for _, t in pairs(self.Tabs) do
 			t.Container.Visible = false
-			TweenService:Create(t.Button, TweenInfo.new(0.25), { BackgroundColor3 = Color3.fromRGB(40, 40, 40) }):Play()
+			tween(t.Button, 0.25, { BackgroundColor3 = Color3.fromRGB(40, 40, 40) })
 		end
+
 		cont.Visible = true
-		TweenService:Create(btn, TweenInfo.new(0.25), { BackgroundColor3 = Color3.fromRGB(70, 70, 70) }):Play()
+		tween(btn, 0.25, { BackgroundColor3 = Color3.fromRGB(70, 70, 70) })
 		self.CurrentTab = tab
 	end)
 
+	-- Define a primeira aba automaticamente
 	if not self.CurrentTab then
 		cont.Visible = true
 		self.CurrentTab = tab
 		btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 	end
 
+	-- Atualiza scroll
+	self:UpdateScrolling(tab)
+
 	return tab
 end
 
 -----------------------------------------------------
--- Atualizar Scroll
+-- ======== UPDATE SCROLLING ========
 -----------------------------------------------------
-function SawMillHub:UpdateScrolling(tabName)
-	local tab = (type(tabName) == "table" and tabName) or self.Tabs[tabName]
+function SawMillHub:UpdateScrolling(tab)
+	if type(tab) == "string" then
+		tab = self.Tabs[tab]
+	end
 	if not tab or not tab.Container then return end
 
 	local container = tab.Container
-	-- só funciona pra ScrollingFrame (evita erros se o container mudou)
 	if not container:IsA("ScrollingFrame") then return end
 
 	local layout = container:FindFirstChildOfClass("UIListLayout")
 	local padding = container:FindFirstChildOfClass("UIPadding")
-	local topPad = 0
-	local bottomPad = 0
-	if padding then
-		topPad = padding.PaddingTop.Offset or 0
-		bottomPad = padding.PaddingBottom.Offset or 0
-	end
+
+	local topPad = (padding and (padding.PaddingTop.Offset or 0)) or 0
+	local bottomPad = (padding and (padding.PaddingBottom.Offset or 0)) or 0
 
 	local function applyCanvas(y)
-		-- garante número inteiro seguro e pelo menos o tamanho do frame visível
-		local finalY = math.max(0, math.floor(y + 0.5))
-		container.CanvasSize = UDim2.new(0, 0, 0, finalY)
+		container.CanvasSize = UDim2.new(0, 0, 0, math.max(0, math.floor(y + 0.5)))
 	end
 
-	if layout then
-		-- espera curto para deixar o layout recalcular (se necessário)
-		-- tenta algumas verificações rápidas; normalmente 1-2 frames bastam
-		for i = 1, 3 do
-			if layout.AbsoluteContentSize.Y > 0 then break end
-			task.wait(0) -- yield 1 frame
-		end
-
-		local absY = layout.AbsoluteContentSize.Y or 0
-		local canvasY = absY + topPad + bottomPad + 8 -- folga extra
-		applyCanvas(canvasY)
-	else
-		-- fallback: soma filhos visíveis (usa AbsoluteSize quando disponível)
-		-- espera um frame pra garantir AbsoluteSize atualizado
-		task.wait(0)
-		local total = 0
-		for _, child in ipairs(container:GetChildren()) do
-			if child:IsA("GuiObject") and child.Visible then
-				local h = 0
-				-- prefere AbsoluteSize (mais confiável depois do layout)
-				if child.AbsoluteSize and child.AbsoluteSize.Y and child.AbsoluteSize.Y > 0 then
-					h = child.AbsoluteSize.Y
-				elseif child.Size and child.Size.Y and child.Size.Y.Offset then
-					h = child.Size.Y.Offset
+	local function update()
+		if layout then
+			local contentSize = layout.AbsoluteContentSize.Y
+			local total = contentSize + topPad + bottomPad + 8
+			applyCanvas(total)
+		else
+			local total = topPad + bottomPad + 8
+			for _, child in ipairs(container:GetChildren()) do
+				if child:IsA("GuiObject") and child.Visible then
+					total += child.AbsoluteSize.Y > 0 and child.AbsoluteSize.Y or (child.Size.Y.Offset or 0)
 				end
-				total = total + h
 			end
-		end
-		applyCanvas(total + topPad + bottomPad + 8)
-	end
-end
-
--- Label (Simplificado: Removido 'initialContent')
------------------------------------------------------
-
--- Assumimos que 'create', UDim2, Color3, Enum, TweenService, e self.Tabs/UpdateScrolling 
--- estão definidos no escopo do script.
-
-function SawMillHub:CreateLabel(tab, text)
-	if not self.Tabs[tab] then return end
-
-	local frame = create("Frame", {
-		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 35),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-	})
-	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 10) })
-	create("UIStroke", { Parent = frame, Color = Color3.fromRGB(60, 60, 60), Thickness = 1, Transparency = 0.5 })
-
-	local lbl = create("TextLabel", {
-		Parent = frame,
-		Text = tostring(text or "Label"),
-		Size = UDim2.new(1, -12, 1, 0),
-		Position = UDim2.new(0, 6, 0, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(235, 235, 235),
-		Font = Enum.Font.GothamBold,
-		TextSize = 15,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Center
-	})
-
-	-- Hover (apenas PC)
-	frame.MouseEnter:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-		}):Play()
-	end)
-	frame.MouseLeave:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-		}):Play()
-	end)
-
-	self:UpdateScrolling(tab)
-
-	return {
-		Frame = frame,
-		Label = lbl,
-		SetText = function(self, newText)
-			lbl.Text = tostring(newText)
-		end,
-		GetText = function(self)
-			return lbl.Text
-		end,
-		Destroy = function(self)
-			frame:Destroy()
-		end
-	}
-end
-
------------------------------------------------------
--- Botão Profissional Moderno (Corrigido com :Set)
------------------------------------------------------
-function SawMillHub:CreateButton(tab, text, callback)
-	if not self.Tabs[tab] then return end
-
-	local initialText = tostring(text or "")
-
-	-- Botão principal
-	local btn = create("TextButton", {
-		Parent = self.Tabs[tab].Container,
-		Text = initialText,
-		Size = UDim2.new(1, -10, 0, 40),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30), -- preto profissional
-		TextColor3 = Color3.fromRGB(235, 235, 235),
-		Font = Enum.Font.Gotham,
-		TextSize = 15,
-		AutoButtonColor = false,
-		ClipsDescendants = true
-	})
-	create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 8)})
-
-	-- Stroke discreto
-	local stroke = create("UIStroke", {
-		Parent = btn,
-		Color = Color3.fromRGB(60, 60, 60),
-		Thickness = 1,
-		Transparency = 0.5
-	})
-
-	-- Hover Effect (PC e mobile)
-	btn.MouseEnter:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-		}):Play()
-	end)
-
-	btn.MouseLeave:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-		}):Play()
-	end)
-
-	-- Click Feedback
-	btn.MouseButton1Down:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.1), {
-			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-			TextColor3 = Color3.fromRGB(200, 200, 200)
-		}):Play()
-	end)
-
-	btn.MouseButton1Up:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.2), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-			TextColor3 = Color3.fromRGB(235, 235, 235)
-		}):Play()
-	end)
-
-	-- Execução do callback
-	btn.MouseButton1Click:Connect(function()
-		if callback then pcall(callback) end
-	end)
-
-	self:UpdateScrolling(tab)
-
-	return {
-		Button = btn,
-		Get = function() return btn.Text end,
-		Set = function(_, newText) btn.Text = tostring(newText) end
-	}
-end
-
-function SawMillHub:CreateToggle(tab, text, default, callback)
-	local TweenService = game:GetService("TweenService")
-	local DebrisService = game:GetService("Debris")
-
-	if not self.Tabs[tab] then return end
-	local container = self.Tabs[tab].Container
-
-	-- CORES NEON VIBRANTES
-	local NEON_ON = Color3.fromRGB(0, 255, 120)    -- Fundo Verde Neon
-	local NEON_OFF_BG = Color3.fromRGB(150, 40, 40) -- Fundo Vermelho Sutil
-	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50) -- Vermelho Neon puro
-	local TEXT_COLOR_OFF = Color3.fromRGB(180, 180, 180)
-
-	-- Estado inicial
-	local currentState = default == true
-
-	-- Posições
-	local ON_POS = UDim2.new(1, -25, 0.5, -12)
-	local OFF_POS = UDim2.new(0, 1, 0.5, -12)
-
-	-- Container principal
-	local toggle = create("Frame", {
-		Parent = container,
-		Size = UDim2.new(1, -10, 0, 45),
-		BackgroundTransparency = 1
-	})
-
-	-- Label
-	local label = create("TextLabel", {
-		Parent = toggle,
-		Size = UDim2.new(0.7, 0, 1, 0),
-		Position = UDim2.new(0, 10, 0, 0),
-		BackgroundTransparency = 1,
-		Text = text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 16,
-		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
-
-	-- Switch base
-	local switch = create("Frame", {
-		Parent = toggle,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0.5, 0),
-		Size = UDim2.new(0, 55, 0, 26),
-		BackgroundColor3 = currentState and NEON_ON or NEON_OFF_BG,
-		BorderSizePixel = 0,
-	})
-	create("UICorner", {Parent = switch, CornerRadius = UDim.new(1, 0)})
-
-	-- Glow neon
-	local glow = create("UIStroke", {
-		Parent = switch,
-		Color = currentState and NEON_ON or NEON_OFF_GLOW,
-		Transparency = currentState and 0.2 or 0.4,
-		Thickness = 2
-	})
-
-	-- Handle
-	local handle = create("Frame", {
-		Parent = switch,
-		Size = UDim2.new(0, 24, 0, 24),
-		Position = currentState and ON_POS or OFF_POS,
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		BorderSizePixel = 0,
-	})
-	create("UICorner", {Parent = handle, CornerRadius = UDim.new(1, 0)})
-
-	-- Gradiente animado no handle
-	local gradient = create("UIGradient", {
-		Parent = handle,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(200,200,200))
-		}),
-		Rotation = 45
-	})
-
-	task.spawn(function()
-		while handle.Parent do
-			gradient.Rotation = (gradient.Rotation + 1) % 360
-			task.wait(0.016)
-		end
-	end)
-
-	-- Função de pulso
-	local function createPulse(color)
-		local pulse = create("Frame", {
-			Parent = switch,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.5, 0),
-			Size = UDim2.new(0.9, 0, 0.9, 0),
-			BackgroundColor3 = color,
-			BackgroundTransparency = 0.6,
-			BorderSizePixel = 0,
-			ZIndex = -1
-		})
-		create("UICorner", {Parent = pulse, CornerRadius = UDim.new(1, 0)})
-
-		TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = UDim2.new(1.8, 0, 1.8, 0),
-			BackgroundTransparency = 1
-		}):Play()
-		DebrisService:AddItem(pulse, 0.5)
-	end
-
-	-- Função principal de toggle
-	local function updateToggle(state, triggerCallback)
-		currentState = state
-
-		-- Animação de click
-		TweenService:Create(switch, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{Size = UDim2.new(0, 52, 0, 24)}
-		):Play()
-		task.delay(0.1, function()
-			TweenService:Create(switch, TweenInfo.new(0.2, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
-				{Size = UDim2.new(0, 55, 0, 26)}
-			):Play()
-		end)
-
-		-- Define cores
-		local targetGlowColor = currentState and NEON_ON or NEON_OFF_GLOW
-		local targetBGColor = currentState and NEON_ON or NEON_OFF_BG
-		local targetLabelColor = currentState and NEON_ON or TEXT_COLOR_OFF
-
-		-- Atualiza visuais
-		TweenService:Create(switch, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{BackgroundColor3 = targetBGColor}
-		):Play()
-		TweenService:Create(label, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{TextColor3 = targetLabelColor}
-		):Play()
-		TweenService:Create(glow, TweenInfo.new(0.35),
-			{Color = targetGlowColor, Transparency = currentState and 0.2 or 0.4}
-		):Play()
-
-		-- Move handle
-		TweenService:Create(handle, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-			{Position = currentState and ON_POS or OFF_POS}
-		):Play()
-
-		-- Pulso visual
-		createPulse(targetGlowColor)
-
-		-- Callback
-		if callback and triggerCallback then
-			task.spawn(callback, currentState)
+			applyCanvas(total)
 		end
 	end
 
-	-- Alternar estado
-	local function toggleSwitch()
-		updateToggle(not currentState, true)
+	update()
+
+	if layout and not layout:GetAttribute("ScrollLinked") then
+		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(update)
+		layout:SetAttribute("ScrollLinked", true)
 	end
-
-	-- Dispara callback inicial
-	if currentState and callback then
-		task.spawn(callback, currentState)
-	end
-
-	-- Clique do usuário
-	local isHolding = false
-	switch.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if isHolding then return end
-			isHolding = true
-			toggleSwitch()
-		end
-	end)
-	switch.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			isHolding = false
-		end
-	end)
-
-	-- Hover animado
-	switch.MouseEnter:Connect(function()
-		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{Thickness = 3, Transparency = 0.1}
-		):Play()
-	end)
-	switch.MouseLeave:Connect(function()
-		TweenService:Create(glow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{Thickness = 2, Transparency = currentState and 0.2 or 0.4}
-		):Play()
-	end)
-
-	self:UpdateScrolling(tab)
-
-	-- Retorna um objeto com controle manual
-	local toggleObject = {}
-
-	-- Define o estado manualmente (true = ligado, false = desligado)
-	function toggleObject:Set(state)
-		updateToggle(state, true)
-	end
-
-	-- Pega o estado atual
-	function toggleObject:Get()
-		return currentState
-	end
-
-	-- Referências úteis
-	toggleObject.Frame = toggle
-	toggleObject.Switch = switch
-
-	return toggleObject
 end
 
 function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callback)
@@ -789,6 +525,310 @@ function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callba
 	}
 end
 
+function SawMillHub:CreateLabel(tab, text)
+	if not self.Tabs[tab] then return end
+
+	-- Card principal
+	local frame = create("Frame", {
+		Parent = self.Tabs[tab].Container,
+		Size = UDim2.new(1, -10, 0, 50),
+		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+		ClipsDescendants = true,
+		ZIndex = 1
+	})
+	create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 14)})
+
+	-- Sombra sutil
+	local shadow = create("Frame", {
+		Parent = frame,
+		Size = UDim2.new(1,0,1,6),
+		Position = UDim2.new(0,0,0,0),
+		BackgroundColor3 = Color3.fromRGB(0,0,0),
+		BackgroundTransparency = 0.85,
+		ZIndex = 0
+	})
+	create("UICorner", {Parent = shadow, CornerRadius = UDim.new(0, 14)})
+
+	-- Stroke elegante
+	local stroke = create("UIStroke", {
+		Parent = frame,
+		Color = Color3.fromRGB(80,80,80),
+		Thickness = 1,
+		Transparency = 0.4
+	})
+
+	-- Texto
+	local lbl = create("TextLabel", {
+		Parent = frame,
+		Text = tostring(text or "Label"),
+		Size = UDim2.new(1, -20, 1, -10),
+		Position = UDim2.new(0, 10, 0, 5),
+		BackgroundTransparency = 1,
+		TextColor3 = Color3.fromRGB(240, 240, 240),
+		Font = Enum.Font.Gotham,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		TextWrapped = true
+	})
+
+	-- Hover (PC)
+	frame.MouseEnter:Connect(function()
+		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(38, 38, 38),
+			Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset - 2)
+		}):Play()
+	end)
+	frame.MouseLeave:Connect(function()
+		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+			Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset + 2)
+		}):Play()
+	end)
+
+	-- Clique (efeito de depressão)
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Position = frame.Position + UDim2.new(0, 0, 0, 2)
+			}):Play()
+		end
+	end)
+	frame.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Position = frame.Position - UDim2.new(0, 0, 0, 2)
+			}):Play()
+		end
+	end)
+
+	self:UpdateScrolling(tab)
+
+	return {
+		Frame = frame,
+		Label = lbl,
+		SetText = function(self, newText)
+			lbl.Text = tostring(newText)
+		end,
+		GetText = function(self)
+			return lbl.Text
+		end,
+		Destroy = function(self)
+			frame:Destroy()
+		end
+	}
+end
+
+-----------------------------------------------------
+-- Botão Profissional Moderno (Corrigido com :Set)
+-----------------------------------------------------
+function SawMillHub:CreateButton(tab, text, callback)
+	if not self.Tabs[tab] then return end
+
+	local initialText = tostring(text or "")
+
+	-- Botão principal
+	local btn = create("TextButton", {
+		Parent = self.Tabs[tab].Container,
+		Text = initialText,
+		Size = UDim2.new(1, -10, 0, 40),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 30), -- preto profissional
+		TextColor3 = Color3.fromRGB(235, 235, 235),
+		Font = Enum.Font.Gotham,
+		TextSize = 15,
+		AutoButtonColor = false,
+		ClipsDescendants = true
+	})
+	create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 8)})
+
+	-- Stroke discreto
+	local stroke = create("UIStroke", {
+		Parent = btn,
+		Color = Color3.fromRGB(60, 60, 60),
+		Thickness = 1,
+		Transparency = 0.5
+	})
+
+	-- Hover Effect (PC e mobile)
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+			BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+		}):Play()
+	end)
+
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+			BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+		}):Play()
+	end)
+
+	-- Click Feedback
+	btn.MouseButton1Down:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.1), {
+			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+			TextColor3 = Color3.fromRGB(200, 200, 200)
+		}):Play()
+	end)
+
+	btn.MouseButton1Up:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.2), {
+			BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+			TextColor3 = Color3.fromRGB(235, 235, 235)
+		}):Play()
+	end)
+
+	-- Execução do callback
+	btn.MouseButton1Click:Connect(function()
+		if callback then pcall(callback) end
+	end)
+
+	self:UpdateScrolling(tab)
+
+	return {
+		Button = btn,
+		Get = function() return btn.Text end,
+		Set = function(_, newText) btn.Text = tostring(newText) end
+	}
+end
+
+function SawMillHub:CreateToggle(tab, text, default, callback)
+	local TweenService = game:GetService("TweenService")
+	local Debris = game:GetService("Debris")
+	local UserInputService = game:GetService("UserInputService")
+
+	if not self.Tabs[tab] then return end
+	local container = self.Tabs[tab].Container
+
+	local NEON_ON = Color3.fromRGB(0, 255, 120)
+	local NEON_OFF_BG = Color3.fromRGB(120, 30, 30)
+	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50)
+	local TEXT_COLOR_OFF = Color3.fromRGB(200, 200, 200)
+
+	local currentState = default == true
+
+	local ON_POS = UDim2.new(1, -25, 0.5, -12)
+	local OFF_POS = UDim2.new(0, 1, 0.5, -12)
+
+	local toggle = create("Frame", {
+		Parent = container,
+		Size = UDim2.new(1, -10, 0, 44),
+		BackgroundTransparency = 1
+	})
+
+	local label = create("TextLabel", {
+		Parent = toggle,
+		Size = UDim2.new(0.7, 0, 1, 0),
+		Position = UDim2.new(0, 10, 0, 0),
+		BackgroundTransparency = 1,
+		Text = text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF,
+		TextXAlignment = Enum.TextXAlignment.Left
+	})
+
+	local switch = create("Frame", {
+		Parent = toggle,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, 0),
+		Size = UDim2.new(0, 55, 0, 26),
+		BackgroundColor3 = currentState and NEON_ON or NEON_OFF_BG,
+		BorderSizePixel = 0,
+	})
+	create("UICorner", {Parent = switch, CornerRadius = UDim.new(1, 0)})
+
+	local glow = create("UIStroke", {
+		Parent = switch,
+		Color = currentState and NEON_ON or NEON_OFF_GLOW,
+		Transparency = currentState and 0.25 or 0.5,
+		Thickness = 2
+	})
+
+	local handle = create("Frame", {
+		Parent = switch,
+		Size = UDim2.new(0, 24, 0, 24),
+		Position = currentState and ON_POS or OFF_POS,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderSizePixel = 0,
+	})
+	create("UICorner", {Parent = handle, CornerRadius = UDim.new(1, 0)})
+
+	local gradient = create("UIGradient", {
+		Parent = handle,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
+		}),
+		Rotation = 30
+	})
+	task.spawn(function()
+		while handle.Parent do
+			gradient.Rotation = (gradient.Rotation + 0.6) % 360
+			task.wait(0.016)
+		end
+	end)
+
+	local function createPulse(color)
+		local pulse = create("Frame", {
+			Parent = switch,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.new(0.9, 0, 0.9, 0),
+			BackgroundColor3 = color,
+			BackgroundTransparency = 0.7,
+			BorderSizePixel = 0,
+			ZIndex = -1
+		})
+		create("UICorner", {Parent = pulse, CornerRadius = UDim.new(1, 0)})
+		TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.new(1.8, 0, 1.8, 0),
+			BackgroundTransparency = 1
+		}):Play()
+		Debris:AddItem(pulse, 0.5)
+	end
+
+	local function updateToggle(state, triggerCallback)
+		currentState = state
+
+		local colorBG = state and NEON_ON or NEON_OFF_BG
+		local colorGlow = state and NEON_ON or NEON_OFF_GLOW
+		local colorText = state and NEON_ON or TEXT_COLOR_OFF
+
+		TweenService:Create(switch, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundColor3 = colorBG}):Play()
+		TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow, Transparency = state and 0.25 or 0.5}):Play()
+		TweenService:Create(label, TweenInfo.new(0.25), {TextColor3 = colorText}):Play()
+		TweenService:Create(handle, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and ON_POS or OFF_POS}):Play()
+
+		createPulse(colorGlow)
+
+		if callback and triggerCallback then
+			task.spawn(callback, currentState)
+		end
+	end
+
+	-- Clique compatível PC + Touch
+	local function onToggle()
+		updateToggle(not currentState, true)
+	end
+
+	switch.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			onToggle()
+		end
+	end)
+
+	self:UpdateScrolling(tab)
+
+	local toggleObject = {}
+	function toggleObject:Set(state) updateToggle(state, true) end
+	function toggleObject:Get() return currentState end
+	toggleObject.Frame = toggle
+	toggleObject.Switch = switch
+
+	return toggleObject
+end
+
+
 function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local TweenService = game:GetService("TweenService")
 	local NEON_BLUE = Color3.fromRGB(0, 170, 255)
@@ -798,30 +838,25 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 
 	local neonBlue = NEON_BLUE
 	local darkBackground = Color3.fromRGB(25, 25, 25)
-	local selectedBackground = Color3.fromRGB(45, 45, 45)
+	local selectedBackground = Color3.fromRGB(40, 40, 40)
 	local optionBackground = Color3.fromRGB(35, 35, 35)
 	local optionHover = Color3.fromRGB(50, 50, 50)
 
 	local selectedValue = nil
 	local optionMap = {}
 
-	-- CONTAINER PRINCIPAL
+	-----------------------------------------------------
+	-- Container principal
+	-----------------------------------------------------
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
 		Size = UDim2.new(1, -10, 0, 50),
 		BackgroundColor3 = darkBackground,
 		ClipsDescendants = true
 	})
-	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 14) })
+	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 12) })
+	create("UIStroke", { Parent = frame, Color = Color3.fromRGB(70, 70, 70), Thickness = 1, Transparency = 0.5 })
 
-	local mainStroke = create("UIStroke", {
-		Parent = frame,
-		Color = Color3.fromRGB(70, 70, 70),
-		Thickness = 1,
-		Transparency = 0.5
-	})
-
-	-- BOTÃO PRINCIPAL
 	local btn = create("TextButton", {
 		Parent = frame,
 		Text = "",
@@ -836,30 +871,31 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		Size = UDim2.new(1, -60, 1, 0),
 		Position = UDim2.new(0, 14, 0, 0),
 		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = Color3.fromRGB(240, 240, 240),
 		Font = Enum.Font.GothamBold,
-		TextSize = 16,
+		TextSize = 15,
 		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
 	local arrow = create("TextLabel", {
 		Parent = btn,
 		Text = "▼",
-		Size = UDim2.new(0, 30, 0, 30),
+		Size = UDim2.new(0, 28, 0, 28),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -14, 0.5, 0),
+		Position = UDim2.new(1, -12, 0.5, 0),
 		BackgroundTransparency = 1,
 		TextColor3 = neonBlue,
 		Font = Enum.Font.GothamBlack,
-		TextSize = 25,
+		TextSize = 22,
 		ZIndex = 2
 	})
 
-	-- LISTA DE OPÇÕES (ScrollingFrame)
-	local listHeight = #options * 38 + 8
+	-----------------------------------------------------
+	-- Lista de opções
+	-----------------------------------------------------
 	local list = create("ScrollingFrame", {
 		Parent = frame,
-		Size = UDim2.new(1, 0, 0, listHeight),
+		Size = UDim2.new(1, 0, 0, 0),
 		Position = UDim2.new(0, 0, 0, 50),
 		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
 		Visible = false,
@@ -867,39 +903,70 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y
 	})
-	create("UICorner", { Parent = list, CornerRadius = UDim.new(0, 14) })
-	local listStroke = create("UIStroke", { Parent = list, Color = neonBlue, Thickness = 1.2, Transparency = 1 })
+	create("UICorner", { Parent = list, CornerRadius = UDim.new(0, 10) })
+	create("UIStroke", { Parent = list, Color = neonBlue, Thickness = 1, Transparency = 1 })
 	create("UIListLayout", { Parent = list, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
-	create("UIPadding", { Parent = list, PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
+	create("UIPadding", { Parent = list, PaddingTop = UDim.new(0, 4), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
 
 	local open = false
 	local selectedCheck = nil
 
-	-- Toggle abrir/fechar
-	local function toggleDropdown()
-		open = not open
-		list.Visible = true
-		TweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-			Rotation = open and 180 or 0
-		}):Play()
-		TweenService:Create(mainStroke, TweenInfo.new(0.3), { Transparency = open and 1 or 0.5 }):Play()
-		TweenService:Create(listStroke, TweenInfo.new(0.3), { Transparency = open and 0.5 or 1 }):Play()
-		local goalSize = open and UDim2.new(1, -10, 0, 50 + listHeight) or UDim2.new(1, -10, 0, 50)
-		TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = goalSize}):Play()
-		TweenService:Create(list, TweenInfo.new(0.2), {BackgroundTransparency = open and 0 or 1}):Play()
+	-----------------------------------------------------
+	-- Atualização dinâmica do Canvas e tamanho do dropdown
+	-----------------------------------------------------
+	local function updateDropdownSize(animated)
+		local layout = list:FindFirstChildOfClass("UIListLayout")
+		if not layout then return end
 
-		if not open then
-			task.delay(0.4, function()
-				if not open and frame.Size.Y.Offset <= 50 then list.Visible = false end
-			end)
+		task.wait(0.02)
+		local totalHeight = layout.AbsoluteContentSize.Y + 8
+		list.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+		local goalY = open and (50 + math.min(totalHeight, 180)) or 50
+
+		if animated then
+			TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(1, -10, 0, goalY) }):Play()
+		else
+			frame.Size = UDim2.new(1, -10, 0, goalY)
 		end
 
 		self:UpdateScrolling(self.Tabs[tab])
 	end
 
+	-----------------------------------------------------
+	-- Toggle abrir/fechar
+	-----------------------------------------------------
+	local function toggleDropdown()
+		open = not open
+		list.Visible = true
+
+		TweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+			Rotation = open and 180 or 0
+		}):Play()
+
+		TweenService:Create(list, TweenInfo.new(0.3), { BackgroundTransparency = open and 0 or 1 }):Play()
+
+		if open then
+			TweenService:Create(list, TweenInfo.new(0.25), { Size = UDim2.new(1, 0, 0, 180) }):Play()
+		else
+			TweenService:Create(list, TweenInfo.new(0.25), { Size = UDim2.new(1, 0, 0, 0) }):Play()
+		end
+
+		task.defer(function()
+			updateDropdownSize(true)
+		end)
+
+		if not open then
+			task.delay(0.4, function()
+				if not open then list.Visible = false end
+			end)
+		end
+	end
+
 	btn.MouseButton1Click:Connect(toggleDropdown)
 
+	-----------------------------------------------------
 	-- Selecionar opção
+	-----------------------------------------------------
 	local function selectOption(opt)
 		if selectedCheck then selectedCheck.Visible = false end
 		local item = optionMap[opt]
@@ -910,16 +977,20 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		selectedValue = opt
 		btnLabel.Text = text .. ": " .. opt
 
-		TweenService:Create(btnLabel, TweenInfo.new(0.1), { TextColor3 = neonBlue }):Play()
-		task.delay(0.5, function()
-			TweenService:Create(btnLabel, TweenInfo.new(0.3), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+		TweenService:Create(btnLabel, TweenInfo.new(0.15), { TextColor3 = neonBlue }):Play()
+		task.delay(0.4, function()
+			TweenService:Create(btnLabel, TweenInfo.new(0.25), { TextColor3 = Color3.fromRGB(240, 240, 240) }):Play()
 		end)
+
 		if callback then pcall(callback, opt) end
 	end
 
+	-----------------------------------------------------
 	-- Criar uma opção
+	-----------------------------------------------------
 	local function createOption(opt)
 		if optionMap[opt] then return end
+
 		local optBtn = create("TextButton", {
 			Parent = list,
 			Text = "",
@@ -935,7 +1006,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 			Size = UDim2.new(1, -50, 1, 0),
 			Position = UDim2.new(0, 12, 0, 0),
 			BackgroundTransparency = 1,
-			TextColor3 = Color3.fromRGB(230, 230, 230),
+			TextColor3 = Color3.fromRGB(235, 235, 235),
 			Font = Enum.Font.Gotham,
 			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Left
@@ -957,21 +1028,22 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		optionMap[opt] = { Button = optBtn, Check = check }
 
 		optBtn.MouseEnter:Connect(function()
-			TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = optionHover}):Play()
+			TweenService:Create(optBtn, TweenInfo.new(0.15), { BackgroundColor3 = optionHover }):Play()
 		end)
 		optBtn.MouseLeave:Connect(function()
-			TweenService:Create(optBtn, TweenInfo.new(0.2), {BackgroundColor3 = optionBackground}):Play()
+			TweenService:Create(optBtn, TweenInfo.new(0.25), { BackgroundColor3 = optionBackground }):Play()
 		end)
 		optBtn.MouseButton1Click:Connect(function()
 			selectOption(opt)
 			toggleDropdown()
 		end)
 
-		-- Atualiza scroll
-		self:UpdateScrolling(self.Tabs[tab])
+		updateDropdownSize(false)
 	end
 
+	-----------------------------------------------------
 	-- Remover opção
+	-----------------------------------------------------
 	local function removeOption(opt)
 		local item = optionMap[opt]
 		if item then
@@ -981,35 +1053,34 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 				selectedValue = nil
 				btnLabel.Text = text .. ": (Selecione)"
 			end
-
-			-- Atualiza scroll
-			self:UpdateScrolling(self.Tabs[tab])
+			updateDropdownSize(true)
 		end
 	end
 
-	-- Setar lista de opções do zero
+	-----------------------------------------------------
+	-- Setar lista de opções
+	-----------------------------------------------------
 	local function setOptions(newOptions)
 		for opt, item in pairs(optionMap) do
 			item.Button:Destroy()
 		end
 		optionMap = {}
 		options = newOptions
-		listHeight = #options * 38 + 8
-		list.Size = UDim2.new(1, 0, 0, listHeight)
 		for _, opt in ipairs(options) do
 			createOption(opt)
 		end
 		btnLabel.Text = text .. ": (Selecione)"
 		selectedValue = nil
-
-		self:UpdateScrolling(self.Tabs[tab])
+		updateDropdownSize(true)
 	end
 
-	-- Inicializar
+	-----------------------------------------------------
+	-- Inicialização
+	-----------------------------------------------------
 	for _, opt in ipairs(options) do
 		createOption(opt)
 	end
-
+	updateDropdownSize(false)
 	self:UpdateScrolling(self.Tabs[tab])
 
 	return {
@@ -1021,6 +1092,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		SetOptions = function(_, newOptions) setOptions(newOptions) end
 	}
 end
+
 
 function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	local TweenService = game:GetService("TweenService")
@@ -1156,218 +1228,329 @@ function SawMillHub:CreateInput(tab, text, placeholder, callback)
 	}
 end
 
+-----------------------------------------------------
+-- 🔑 Criar Keybind (visual moderno e otimizado)
+-----------------------------------------------------
 function SawMillHub:CreateKeybind(tab, text, defaultKey, callback)
 	if not self.Tabs[tab] then return end
 
-	local frame = create("Frame", {
-		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 55),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		ClipsDescendants = true
-	})
-	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 12) })
-	local stroke = create("UIStroke", { Parent = frame, Color = Color3.fromRGB(80, 80, 80), Thickness = 1, Transparency = 0.5 })
+	local TweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local container = self.Tabs[tab].Container
 
-	local lbl = create("TextLabel", {
-		Parent = frame,
-		Text = tostring(text or "Keybind"),
-		Size = UDim2.new(1, -12, 0, 20),
-		Position = UDim2.new(0, 8, 0, 6),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 14,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
+	local selectedKey = defaultKey or Enum.KeyCode.F
+	local listening = false
+	local connections = {}
 
-	local btn = create("TextButton", {
-		Parent = frame,
-		Text = defaultKey and defaultKey.Name or "Nenhuma",
-		Size = UDim2.new(0, 130, 0, 30),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0.65, 0),
-		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 15
-	})
-	create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 8) })
-	local btnStroke = create("UIStroke", {Parent = btn, Color = Color3.fromRGB(0,255,255), Thickness = 2, Transparency = 0.5})
+	-- 🧱 Container principal
+	local frame = Instance.new("Frame")
+	frame.Parent = container
+	frame.Size = UDim2.new(1, -10, 0, 44)
+	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	frame.BorderSizePixel = 0
+	frame.Name = "Keybind"
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
-	local selectedKey = defaultKey or Enum.KeyCode.Unknown
-	local waiting = false
+	-- Sombra leve
+	local shadow = Instance.new("ImageLabel")
+	shadow.Parent = frame
+	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	shadow.Position = UDim2.new(0.5, 0, 0.5, 4)
+	shadow.Size = UDim2.new(1, 8, 1, 8)
+	shadow.Image = "rbxassetid://5028857084"
+	shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	shadow.ImageTransparency = 0.85
+	shadow.ScaleType = Enum.ScaleType.Slice
+	shadow.SliceCenter = Rect.new(24, 24, 276, 276)
+	shadow.ZIndex = 0
 
-	local function setKey(newKey)
-		selectedKey = newKey
-		btn.Text = newKey.Name
-		if callback then pcall(callback, selectedKey) end
+	-- 🏷️ Título
+	local label = Instance.new("TextLabel")
+	label.Parent = frame
+	label.Size = UDim2.new(0.6, 0, 1, 0)
+	label.Position = UDim2.new(0, 10, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = tostring(text or "Keybind")
+	label.TextColor3 = Color3.fromRGB(235, 235, 235)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 15
+	label.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- ⌨️ Botão da tecla
+	local keyButton = Instance.new("TextButton")
+	keyButton.Parent = frame
+	keyButton.Size = UDim2.new(0, 110, 0, 28)
+	keyButton.AnchorPoint = Vector2.new(1, 0.5)
+	keyButton.Position = UDim2.new(1, -10, 0.5, 0)
+	keyButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	keyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	keyButton.Text = selectedKey.Name
+	keyButton.Font = Enum.Font.Gotham
+	keyButton.TextSize = 14
+	keyButton.AutoButtonColor = false
+	Instance.new("UICorner", keyButton).CornerRadius = UDim.new(0, 6)
+
+	local stroke = Instance.new("UIStroke", keyButton)
+	stroke.Color = Color3.fromRGB(90, 90, 90)
+	stroke.Thickness = 1
+	stroke.Transparency = 0.25
+
+	-- ✨ Animação hover
+	local function tweenColor(obj, color)
+		TweenService:Create(obj, TweenInfo.new(0.15), { BackgroundColor3 = color }):Play()
 	end
 
-	btn.MouseButton1Click:Connect(function()
-		if waiting then return end
-		waiting = true
-		btn.Text = "Pressione..."
-		TweenService:Create(btnStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(0, 255, 120), Transparency = 0}):Play()
-		TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0,50,100)}):Play()
+	keyButton.MouseEnter:Connect(function()
+		if not listening then
+			tweenColor(keyButton, Color3.fromRGB(55, 55, 55))
+		end
+	end)
+	keyButton.MouseLeave:Connect(function()
+		if not listening then
+			tweenColor(keyButton, Color3.fromRGB(40, 40, 40))
+		end
+	end)
 
-		local conn
-		conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-			if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
-				setKey(input.KeyCode)
-				waiting = false
-				conn:Disconnect()
-				TweenService:Create(btnStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(0,255,255), Transparency = 0.5}):Play()
-				TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35,35,35)}):Play()
+	-- 🧠 Capturar nova tecla
+	keyButton.MouseButton1Click:Connect(function()
+		if listening then return end
+		listening = true
+		keyButton.Text = "Press any key..."
+		tweenColor(keyButton, Color3.fromRGB(85, 85, 85))
+
+		local temp
+		temp = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if gameProcessed then return end
+			if input.KeyCode ~= Enum.KeyCode.Unknown then
+				selectedKey = input.KeyCode
+				keyButton.Text = selectedKey.Name
+				listening = false
+				tweenColor(keyButton, Color3.fromRGB(40, 40, 40))
+				temp:Disconnect()
 			end
 		end)
 	end)
-	local function onInput(input, gameProcessed)
-		if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == selectedKey and not waiting then
-			if callback then pcall(callback, selectedKey) end
-		end
-	end
 
-	UserInputService.InputBegan:Connect(onInput)
+	-- ⚡ Execução da tecla
+	local keyConn = UserInputService.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+		if not listening and input.KeyCode == selectedKey then
+			TweenService:Create(keyButton, TweenInfo.new(0.08), {
+				BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+			}):Play()
+
+			task.delay(0.12, function()
+				if not listening then
+					tweenColor(keyButton, Color3.fromRGB(40, 40, 40))
+				end
+			end)
+
+			task.spawn(function()
+				if callback then
+					pcall(callback)
+				end
+			end)
+		end
+	end)
+	table.insert(connections, keyConn)
 
 	self:UpdateScrolling(tab)
 
-	return {
-		Get = function() return selectedKey end,
-		Set = function(_, newKey) setKey(newKey) end
-	}
+	-- ✅ Retornar manipulador
+	local api = {}
+
+	function api:Get()
+		return selectedKey
+	end
+
+	function api:Set(newKey)
+		if typeof(newKey) == "EnumItem" and newKey.EnumType == Enum.KeyCode then
+			selectedKey = newKey
+			keyButton.Text = newKey.Name
+		end
+	end
+
+	function api:Disconnect()
+		for _, conn in ipairs(connections) do
+			if conn.Disconnect then
+				conn:Disconnect()
+			end
+		end
+	end
+
+	return api
 end
-function SawMillHub:Notify(title, message, duration)
+
+function SawMillHub:Notify(title, message, duration, type)
 	duration = duration or 3
 	local TweenService = game:GetService("TweenService")
 	local DebrisService = game:GetService("Debris")
+	local UserInputService = game:GetService("UserInputService")
 	local isTouch = UserInputService.TouchEnabled
 
-	local NEON_BLUE = Color3.fromRGB(0, 170, 255)
-	local BASE_BG_PC = Color3.fromRGB(30, 30, 30)
-	local BASE_BG_CL = Color3.fromRGB(35, 35, 35)
+	-- Cores e ícones
+	local COLORS = {
+		info = Color3.fromRGB(0, 170, 255),
+		success = Color3.fromRGB(0, 200, 100),
+		error = Color3.fromRGB(255, 70, 70),
+		warning = Color3.fromRGB(255, 180, 0),
+		default = Color3.fromRGB(180, 180, 180)
+	}
+	local ICONS = {
+		info = "rbxassetid://6034509993",
+		success = "rbxassetid://6023426926",
+		error = "rbxassetid://6023426921",
+		warning = "rbxassetid://6023426921"
+	}
 
-	if not self.ActiveNotifications then
-		self.ActiveNotifications = {}
-	end
+	local color = COLORS[type] or COLORS.default
+	local iconId = ICONS[type]
 
+	-- Proporcionalidade
+	local screenSize = workspace.CurrentCamera.ViewportSize
+	local notifWidth = math.clamp(screenSize.X * 0.25, 240, 360)
+	local notifPadding = 8
+	local notifHeight = isTouch and 70 or 100
+
+	self.ActiveNotifications = self.ActiveNotifications or {}
 	local MAX_NOTIFS = self.MaxNotifs or 5
-	
+
+	-- Criar holder se não existir
 	if not self.NotificationHolder then
-		local holderWidth = isTouch and 280 or 320
-		local holder = create("Frame", {
-			Parent = self.Gui,
-			Name = "NotificationHolder",
-			Size = UDim2.new(0, holderWidth, 1, -20),
-			Position = UDim2.new(1, -holderWidth - 10, 1, -10),
-			AnchorPoint = Vector2.new(0, 1),
-			BackgroundTransparency = 1,
-			ClipsDescendants = false
-		})
-		create("UIListLayout", {
-			Parent = holder,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
-			VerticalAlignment = Enum.VerticalAlignment.Bottom
-		})
+		local holder = Instance.new("Frame")
+		holder.Name = "NotificationHolder"
+		holder.Parent = self.Gui
+		holder.AnchorPoint = Vector2.new(1, 1)
+		holder.Position = UDim2.new(1, -10, 1, -10)
+		holder.Size = UDim2.new(0, notifWidth, 1, -20)
+		holder.BackgroundTransparency = 1
+
+		local layout = Instance.new("UIListLayout", holder)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, notifPadding)
+		layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+
 		self.NotificationHolder = holder
 	end
 
-	local holderWidth = self.NotificationHolder.AbsoluteSize.X
-	
+	-- Remover notificações antigas se exceder
 	while #self.ActiveNotifications >= MAX_NOTIFS do
 		local oldest = table.remove(self.ActiveNotifications, 1)
 		if oldest and oldest.Parent then
-			local tweenOut = TweenService:Create(oldest, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-				Position = oldest.Position + UDim2.new(0, holderWidth + 50, 0, 0),
-				BackgroundTransparency = 1
-			})
-			tweenOut:Play()
-			DebrisService:AddItem(oldest, 0.35)
+			TweenService:Create(oldest, TweenInfo.new(0.25), {Position = oldest.Position + UDim2.new(1, 40, 0, 0), BackgroundTransparency = 1}):Play()
+			DebrisService:AddItem(oldest, 0.4)
 		end
 	end
-	local notifHeight = isTouch and 60 or 70
-	local notifWidth = isTouch and 280 or 320
-	local BASE_BG = isTouch and BASE_BG_CL or BASE_BG_PC
-	local notif = create("Frame", {
-		Parent = self.NotificationHolder,
-		Size = UDim2.new(0, notifWidth, 0, notifHeight),
-		BackgroundColor3 = BASE_BG,
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		LayoutOrder = #self.ActiveNotifications + 1,
-		AutomaticSize = Enum.AutomaticSize.Y
-	})
-	create("UICorner", {Parent = notif, CornerRadius = UDim.new(0, 12)})
-	create("UIStroke", {Parent = notif, Color = NEON_BLUE, Thickness = 1.5, Transparency = 0.6})
-	create("UIPadding", {
-		Parent = notif,
-		PaddingLeft = UDim.new(0, 12),
-		PaddingRight = UDim.new(0, 12),
-		PaddingTop = UDim.new(0, 8),
-		PaddingBottom = UDim.new(0, 8)
-	})
-	create("UIListLayout", {Parent = notif, FillDirection = Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4)})
 
-	-- Título
-	local titleLbl = create("TextLabel", {
-		Parent = notif,
-		Text = tostring(title or "Notificação"),
-		Size = UDim2.new(1, 0, 0, 22),
-		BackgroundTransparency = 1,
-		Font = Enum.Font.GothamBold,
-		TextSize = isTouch and 14 or 16,
-		TextColor3 = NEON_BLUE,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextWrapped = true
-	})
-	local msgLbl = create("TextLabel", {
-		Parent = notif,
-		Text = tostring(message or ""),
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		Font = Enum.Font.Gotham,
-		TextSize = isTouch and 12 or 14,
-		TextWrapped = true,
-		TextColor3 = Color3.fromRGB(200, 200, 200),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top
-	})
-	local barHolder = create("Frame", {Parent = notif, Size = UDim2.new(1, 0, 0, 4), BackgroundTransparency = 1})
-	local bar = create("Frame", {Parent = barHolder, Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = NEON_BLUE, BorderSizePixel = 0})
-	create("UICorner", {Parent = bar, CornerRadius = UDim.new(0, 3)})
-	notif.Position = UDim2.new(0, notifWidth + 50, 0, 0)
-	local enterTween = TweenService:Create(notif, TweenInfo.new(0.5, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {
+	-- Criar notificação
+	local notif = Instance.new("Frame")
+	notif.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	notif.Size = UDim2.new(0, notifWidth, 0, notifHeight)
+	notif.BorderSizePixel = 0
+	notif.ClipsDescendants = true
+	notif.LayoutOrder = #self.ActiveNotifications + 1
+	notif.Parent = self.NotificationHolder
+	Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 12)
+
+	local stroke = Instance.new("UIStroke", notif)
+	stroke.Color = color
+	stroke.Thickness = 1.2
+	stroke.Transparency = 0.5
+
+	-- Conteúdo interno
+	local content = Instance.new("Frame", notif)
+	content.Size = UDim2.new(1, -notifPadding*2, 1, -notifPadding*2)
+	content.Position = UDim2.new(0, notifPadding, 0, notifPadding)
+	content.BackgroundTransparency = 1
+	content.ClipsDescendants = true
+
+	local contentLayout = Instance.new("UIListLayout", content)
+	contentLayout.FillDirection = Enum.FillDirection.Horizontal
+	contentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	contentLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	contentLayout.Padding = UDim.new(0, 8)
+
+	-- Ícone
+	if iconId then
+		local icon = Instance.new("ImageLabel", content)
+		icon.Size = UDim2.new(0, 28, 0, 28)
+		icon.Image = iconId
+		icon.BackgroundTransparency = 1
+		icon.ImageColor3 = color
+	end
+
+	-- Texto (título + mensagem)
+	local textContainer = Instance.new("Frame", content)
+	textContainer.BackgroundTransparency = 1
+	textContainer.Size = UDim2.new(1, -36, 1, 0)
+	textContainer.ClipsDescendants = true
+
+	local textLayout = Instance.new("UIListLayout", textContainer)
+	textLayout.FillDirection = Enum.FillDirection.Vertical
+	textLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	textLayout.Padding = UDim.new(0, 2)
+
+	local titleLabel = Instance.new("TextLabel", textContainer)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = tostring(title or "Notificação")
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextColor3 = color
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.TextYAlignment = Enum.TextYAlignment.Top
+	titleLabel.Size = UDim2.new(1, 0, 0, 24)
+	titleLabel.AutomaticSize = Enum.AutomaticSize.Y
+	titleLabel.TextSize = isTouch and 16 or 18
+
+	local msgLabel = Instance.new("TextLabel", textContainer)
+	msgLabel.BackgroundTransparency = 1
+	msgLabel.Text = tostring(message or "")
+	msgLabel.Font = Enum.Font.Gotham
+	msgLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+	msgLabel.TextWrapped = true
+	msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+	msgLabel.TextYAlignment = Enum.TextYAlignment.Top
+	msgLabel.Size = UDim2.new(1, 0, 1, 0)
+	msgLabel.AutomaticSize = Enum.AutomaticSize.Y
+	msgLabel.TextSize = isTouch and 16 or 20
+
+	-- Barra de progresso (sempre abaixo do texto)
+	local barHeight = math.clamp(notifHeight*0.06, 4, 6)
+	local bar = Instance.new("Frame", notif)
+	bar.AnchorPoint = Vector2.new(0,1)
+	bar.Position = UDim2.new(0, 0, 1, -barHeight)
+	bar.Size = UDim2.new(0, 0, 0, barHeight)
+	bar.BackgroundColor3 = color
+	bar.BorderSizePixel = 0
+	Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 3)
+
+	-- Animação barra
+	TweenService:Create(bar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, barHeight)}):Play()
+
+	-- Animação entrada
+	notif.Position = UDim2.new(1, 40, 0, 0)
+	TweenService:Create(notif, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 		Position = UDim2.new(0, 0, 0, 0),
 		BackgroundTransparency = 0
-	})
-	enterTween:Play()
-
-	-- Animação da barra de progresso
-	TweenService:Create(bar, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {
-		Size = UDim2.new(0, 0, 1, 0)
 	}):Play()
 
 	table.insert(self.ActiveNotifications, notif)
 
-	-- Remoção automática após duração
+	-- Remoção automática
 	task.delay(duration, function()
 		if notif and notif.Parent then
 			local tweenOut = TweenService:Create(notif, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-				Position = notif.Position + UDim2.new(0, notifWidth + 50, 0, 0),
+				Position = notif.Position + UDim2.new(1, 40, 0, 0),
 				BackgroundTransparency = 1
 			})
 			tweenOut:Play()
 			tweenOut.Completed:Connect(function()
 				for i, v in ipairs(self.ActiveNotifications) do
-					if v == notif then
-						table.remove(self.ActiveNotifications, i)
-						break
-					end
+					if v == notif then table.remove(self.ActiveNotifications, i); break end
 				end
-				if notif and notif.Parent then notif:Destroy() end
+				if notif then notif:Destroy() end
 			end)
 		end
 	end)
 end
+
 return SawMillHub
