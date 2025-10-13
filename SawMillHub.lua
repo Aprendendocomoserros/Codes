@@ -393,12 +393,16 @@ end
 
 function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callback)
 	if not self.Tabs[tab] then return end
-	min, max = tonumber(min) or 0, tonumber(max) or 100
-	increment = tonumber(increment) or 0 -- 0 significa sem increment
-	default = math.clamp(default or min, min, max)
+
+	-- Garantir valores numéricos válidos
+	min = tonumber(min) or 0
+	max = tonumber(max) or 100
+	increment = tonumber(increment) or 0
+	default = tonumber(default) or min
+	default = math.clamp(default, min, max)
 	local currentValue = default
 
-	-- função para arredondar de acordo com increment
+	-- Função para arredondar de acordo com increment
 	local function roundIncrement(val)
 		if increment > 0 then
 			return math.clamp(math.floor((val + increment/2) / increment) * increment, min, max)
@@ -491,7 +495,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callba
 	inputCircle.FocusLost:Connect(function()
 		local num = tonumber(inputCircle.Text)
 		if num then
-			updateSlider(num, true, false) -- TextBox ignora increment
+			updateSlider(num, true, false)
 		else
 			inputCircle.Text = tostring(currentValue)
 		end
