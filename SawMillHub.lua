@@ -234,9 +234,12 @@ function SawMillHub.new(title, dragSpeed)
 end
 
 -----------------------------------------------------
--- ======== TABS & SCROLL ========
+-- 🌌 SawMillHub: Premium Tab System (Ultra Style)
+-- Visual inspirado em Rayfield / Fluent / Synapse
 -----------------------------------------------------
+
 function SawMillHub:CreateTab(tabName, icon)
+	-- Cria o container lateral uma única vez
 	if not self.TabScroll then
 		local scroll = create("ScrollingFrame", {
 			Parent = self.Sidebar,
@@ -246,40 +249,86 @@ function SawMillHub:CreateTab(tabName, icon)
 			ScrollBarThickness = 4,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			ScrollingDirection = Enum.ScrollingDirection.Y
+			ScrollingDirection = Enum.ScrollingDirection.Y,
 		})
 
 		local layout = create("UIListLayout", {
 			Parent = scroll,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, 6),
-			HorizontalAlignment = Enum.HorizontalAlignment.Center
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		})
 
 		create("UIPadding", {
 			Parent = scroll,
-			PaddingTop = UDim.new(0, 6),
-			PaddingBottom = UDim.new(0, 6),
+			PaddingTop = UDim.new(0, 10),
+			PaddingBottom = UDim.new(0, 10),
 			PaddingLeft = UDim.new(0, 6),
-			PaddingRight = UDim.new(0, 6)
+			PaddingRight = UDim.new(0, 6),
 		})
 
 		self.TabScroll = scroll
 	end
 
+	-----------------------------------------------------
+	-- 🎛️ Botão da Aba
+	-----------------------------------------------------
 	local btn = create("TextButton", {
 		Parent = self.TabScroll,
-		Text = (icon and icon .. " " or "") .. tabName,
-		Size = UDim2.new(1, -10, 0, 34),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-		TextColor3 = Color3.new(1, 1, 1),
-		Font = Enum.Font.Gotham,
-		TextSize = 14,
-		AutoButtonColor = false
+		Text = (icon and icon .. "  " or "") .. tabName,
+		Size = UDim2.new(1, -10, 0, 38),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		TextColor3 = Color3.fromRGB(185, 185, 185),
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		AutoButtonColor = false,
+		BorderSizePixel = 0,
 	})
 
 	create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 8) })
 
+	-- Sombra e brilho sutil
+	create("UIStroke", {
+		Parent = btn,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = Color3.fromRGB(50, 50, 50),
+		Transparency = 0.65,
+		Thickness = 1,
+	})
+
+	-----------------------------------------------------
+	-- ✨ Underline dinâmico com gradiente
+	-----------------------------------------------------
+	local underline = create("Frame", {
+		Parent = btn,
+		Size = UDim2.new(0, 0, 0, 2),
+		Position = UDim2.new(0.5, 0, 1, -2),
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+	})
+
+	local gradient = create("UIGradient", {
+		Parent = underline,
+		Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 150, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 100, 255))
+		},
+		Rotation = 0,
+	})
+
+	create("UICorner", { Parent = underline, CornerRadius = UDim.new(1, 0) })
+
+	-- Anima o gradiente (movimento suave)
+	task.spawn(function()
+		while task.wait(0.03) do
+			gradient.Rotation = (gradient.Rotation + 1) % 360
+		end
+	end)
+
+	-----------------------------------------------------
+	-- 🧱 Conteúdo da Aba
+	-----------------------------------------------------
 	local cont = create("ScrollingFrame", {
 		Parent = self.TabHolder,
 		Size = UDim2.new(1, 0, 1, 0),
@@ -287,66 +336,83 @@ function SawMillHub:CreateTab(tabName, icon)
 		BackgroundTransparency = 1,
 		ScrollBarThickness = 6,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	})
 
 	create("UIListLayout", {
 		Parent = cont,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 6)
+		Padding = UDim.new(0, 10),
 	})
 
 	create("UIPadding", {
 		Parent = cont,
-		PaddingTop = UDim.new(0, 6),
-		PaddingLeft = UDim.new(0, 6),
-		PaddingRight = UDim.new(0, 6),
-		PaddingBottom = UDim.new(0, 6)
+		PaddingTop = UDim.new(0, 10),
+		PaddingLeft = UDim.new(0, 10),
+		PaddingRight = UDim.new(0, 10),
+		PaddingBottom = UDim.new(0, 10),
 	})
 
+	-----------------------------------------------------
+	-- 🪄 Interações Suaves
+	-----------------------------------------------------
 	local tab = { Name = tabName, Button = btn, Container = cont }
 	self.Tabs[tabName] = tab
 
-	-- Hover suave com Tween
+	-- Hover profissional
 	btn.MouseEnter:Connect(function()
 		if self.CurrentTab ~= tab then
-			tween(btn, 0.25, { BackgroundColor3 = Color3.fromRGB(55, 55, 55) })
+			tween(btn, 0.25, {
+				BackgroundColor3 = Color3.fromRGB(28, 28, 28),
+				TextColor3 = Color3.fromRGB(235, 235, 235),
+			})
 		end
 	end)
 
 	btn.MouseLeave:Connect(function()
 		if self.CurrentTab ~= tab then
-			tween(btn, 0.25, { BackgroundColor3 = Color3.fromRGB(40, 40, 40) })
+			tween(btn, 0.3, {
+				BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+				TextColor3 = Color3.fromRGB(185, 185, 185),
+			})
 		end
 	end)
 
-	-- Clique para trocar de aba
+	-- Clique → alternar abas
 	btn.MouseButton1Click:Connect(function()
 		for _, t in pairs(self.Tabs) do
 			t.Container.Visible = false
-			tween(t.Button, 0.25, { BackgroundColor3 = Color3.fromRGB(40, 40, 40) })
+			tween(t.Button, 0.25, {
+				BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+				TextColor3 = Color3.fromRGB(185, 185, 185),
+			})
+			tween(t.Button:FindFirstChildOfClass("Frame"), 0.25, { Size = UDim2.new(0, 0, 0, 2) })
 		end
 
 		cont.Visible = true
-		tween(btn, 0.25, { BackgroundColor3 = Color3.fromRGB(70, 70, 70) })
+		tween(btn, 0.3, {
+			BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+			TextColor3 = Color3.fromRGB(255, 255, 255),
+		})
+		tween(underline, 0.35, { Size = UDim2.new(0.7, 0, 0, 2) })
 		self.CurrentTab = tab
 	end)
 
-	-- Define a primeira aba automaticamente
+	-- Define a primeira aba
 	if not self.CurrentTab then
 		cont.Visible = true
 		self.CurrentTab = tab
-		btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+		btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		underline.Size = UDim2.new(0.7, 0, 0, 2)
 	end
 
-	-- Atualiza scroll
 	self:UpdateScrolling(tab)
-
 	return tab
 end
 
 -----------------------------------------------------
--- ======== UPDATE SCROLLING ========
+-- ⚙️ Update Scrolling
 -----------------------------------------------------
 function SawMillHub:UpdateScrolling(tab)
 	if type(tab) == "string" then
@@ -370,10 +436,10 @@ function SawMillHub:UpdateScrolling(tab)
 	local function update()
 		if layout then
 			local contentSize = layout.AbsoluteContentSize.Y
-			local total = contentSize + topPad + bottomPad + 8
+			local total = contentSize + topPad + bottomPad + 10
 			applyCanvas(total)
 		else
-			local total = topPad + bottomPad + 8
+			local total = topPad + bottomPad + 10
 			for _, child in ipairs(container:GetChildren()) do
 				if child:IsA("GuiObject") and child.Visible then
 					total += child.AbsoluteSize.Y > 0 and child.AbsoluteSize.Y or (child.Size.Y.Offset or 0)
@@ -393,86 +459,102 @@ end
 
 function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callback)
 	if not self.Tabs[tab] then return end
-
-	-- Garantir valores numéricos válidos
-	min = tonumber(min) or 0
-	max = tonumber(max) or 100
+	min, max = tonumber(min) or 0, tonumber(max) or 100
 	increment = tonumber(increment) or 0
-	default = tonumber(default) or min
-	default = math.clamp(default, min, max)
+	default = math.clamp(default or min, min, max)
 	local currentValue = default
 
-	-- Função para arredondar de acordo com increment
 	local function roundIncrement(val)
 		if increment > 0 then
-			return math.clamp(math.floor((val + increment/2) / increment) * increment, min, max)
+			return math.clamp(math.floor((val + increment / 2) / increment) * increment, min, max)
 		else
 			return math.clamp(val, min, max)
 		end
 	end
 
+	-- Container principal
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 60),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+		Size = UDim2.new(1, -10, 0, 65),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
 	})
 	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 10) })
-	create("UIStroke", { Parent = frame, Color = Color3.fromRGB(60, 60, 60), Thickness = 1, Transparency = 0.5 })
+	create("UIStroke", { Parent = frame, Color = Color3.fromRGB(40, 40, 40), Thickness = 1.4, Transparency = 0.4 })
 
+	-- Nome do slider
 	local lbl = create("TextLabel", {
 		Parent = frame,
 		Text = string.format("%s: %d", text or "Slider", default),
 		Size = UDim2.new(0.75, 0, 0, 20),
-		Position = UDim2.new(0, 8, 0, 5),
+		Position = UDim2.new(0, 12, 0, 8),
 		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(235, 235, 235),
+		TextColor3 = Color3.fromRGB(240, 240, 240),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Font = Enum.Font.GothamBold,
 		TextSize = 15
 	})
 
+	-- Campo numérico lateral
 	local inputCircle = create("TextBox", {
 		Parent = frame,
-		Size = UDim2.new(0, 38, 0, 38),
+		Size = UDim2.new(0, 42, 0, 38),
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -10, 0, 5),
+		Position = UDim2.new(1, -12, 0, 10),
 		Text = tostring(default),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
 		TextColor3 = Color3.fromRGB(220, 220, 220),
 		Font = Enum.Font.GothamBold,
 		TextSize = 14,
 		ClearTextOnFocus = false
 	})
 	create("UICorner", { Parent = inputCircle, CornerRadius = UDim.new(1, 0) })
-	create("UIStroke", { Parent = inputCircle, Color = Color3.fromRGB(70, 70, 70), Thickness = 1.2, Transparency = 0.5 })
+	create("UIStroke", { Parent = inputCircle, Color = Color3.fromRGB(70, 70, 70), Thickness = 1.3, Transparency = 0.3 })
 
+	-- Barra base
 	local bar = create("Frame", {
 		Parent = frame,
-		Size = UDim2.new(1, -65, 0, 10),
-		Position = UDim2.new(0, 10, 0, 38),
-		BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		Size = UDim2.new(1, -70, 0, 10),
+		Position = UDim2.new(0, 10, 0, 42),
+		BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 	})
 	create("UICorner", { Parent = bar, CornerRadius = UDim.new(0, 5) })
 
+	-- Preenchimento dinâmico
 	local fill = create("Frame", {
 		Parent = bar,
 		Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
-		BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+		BackgroundColor3 = Color3.fromRGB(0, 120, 255)
 	})
 	create("UICorner", { Parent = fill, CornerRadius = UDim.new(0, 5) })
+	create("UIGradient", {
+		Parent = fill,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 140, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 180, 255))
+		})
+	})
 
+	-- Botão/Thumb
 	local thumb = create("Frame", {
 		Parent = bar,
 		Size = UDim2.new(0, 18, 0, 18),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(fill.Size.X.Scale, 0, 0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+		BackgroundColor3 = Color3.fromRGB(0, 160, 255)
 	})
 	create("UICorner", { Parent = thumb, CornerRadius = UDim.new(1, 0) })
-	create("UIStroke", { Parent = thumb, Color = Color3.fromRGB(80, 80, 80), Thickness = 1, Transparency = 0.4 })
+	create("UIStroke", { Parent = thumb, Color = Color3.fromRGB(255, 255, 255), Thickness = 1.2, Transparency = 0.6 })
+	create("UIGradient", {
+		Parent = thumb,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 150, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+		})
+	})
 
 	local dragging = false
 
+	-- Atualiza valor
 	local function updateSlider(val, instant, fromThumb)
 		if fromThumb then
 			val = roundIncrement(val)
@@ -492,6 +574,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callba
 		if callback then task.spawn(callback, val) end
 	end
 
+	-- Input manual
 	inputCircle.FocusLost:Connect(function()
 		local num = tonumber(inputCircle.Text)
 		if num then
@@ -501,10 +584,11 @@ function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callba
 		end
 	end)
 
+	-- Arrastar slider
 	bar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
-			updateSlider((input.Position.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X*(max-min)+min, false, true)
+			updateSlider((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X * (max - min) + min, false, true)
 		end
 	end)
 
@@ -516,7 +600,7 @@ function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callba
 
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			updateSlider((input.Position.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X*(max-min)+min, false, true)
+			updateSlider((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X * (max - min) + min, false, true)
 		end
 	end)
 
@@ -532,75 +616,119 @@ end
 function SawMillHub:CreateLabel(tab, text)
 	if not self.Tabs[tab] then return end
 
-	-- Card principal
+	-- Container principal
 	local frame = create("Frame", {
 		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 50),
-		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+		Size = UDim2.new(1, -10, 0, 55),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
 		ClipsDescendants = true,
+		ZIndex = 2
+	})
+	create("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 12) })
+	create("UIStroke", {
+		Parent = frame,
+		Color = Color3.fromRGB(40, 40, 40),
+		Thickness = 1.3,
+		Transparency = 0.35
+	})
+
+	-- Glow sutil (base luminosa)
+	local glow = create("Frame", {
+		Parent = frame,
+		Size = UDim2.new(1, 8, 1, 8),
+		Position = UDim2.new(0, -4, 0, -4),
+		BackgroundColor3 = Color3.fromRGB(0, 100, 255),
+		BackgroundTransparency = 1,
 		ZIndex = 1
 	})
-	create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 14)})
-
-	-- Sombra sutil
-	local shadow = create("Frame", {
-		Parent = frame,
-		Size = UDim2.new(1,0,1,6),
-		Position = UDim2.new(0,0,0,0),
-		BackgroundColor3 = Color3.fromRGB(0,0,0),
-		BackgroundTransparency = 0.85,
-		ZIndex = 0
-	})
-	create("UICorner", {Parent = shadow, CornerRadius = UDim.new(0, 14)})
-
-	-- Stroke elegante
-	local stroke = create("UIStroke", {
-		Parent = frame,
-		Color = Color3.fromRGB(80,80,80),
-		Thickness = 1,
-		Transparency = 0.4
+	create("UICorner", { Parent = glow, CornerRadius = UDim.new(0, 14) })
+	create("UIGradient", {
+		Parent = glow,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 140, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 80, 180))
+		}),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.7),
+			NumberSequenceKeypoint.new(1, 1)
+		})
 	})
 
-	-- Texto
+	-- Texto principal
 	local lbl = create("TextLabel", {
 		Parent = frame,
 		Text = tostring(text or "Label"),
 		Size = UDim2.new(1, -20, 1, -10),
 		Position = UDim2.new(0, 10, 0, 5),
 		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(240, 240, 240),
-		Font = Enum.Font.Gotham,
+		TextColor3 = Color3.fromRGB(230, 230, 230),
+		Font = Enum.Font.GothamBold,
 		TextSize = 16,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Center,
-		TextWrapped = true
+		TextWrapped = true,
+		ZIndex = 3
 	})
 
-	-- Hover (PC)
+	-- Linha decorativa lateral (detalhe de design)
+	local accent = create("Frame", {
+		Parent = frame,
+		Size = UDim2.new(0, 3, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		BackgroundColor3 = Color3.fromRGB(0, 120, 255),
+		BackgroundTransparency = 0.3,
+		ZIndex = 3
+	})
+	create("UICorner", { Parent = accent, CornerRadius = UDim.new(0, 3) })
+	create("UIGradient", {
+		Parent = accent,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+		})
+	})
+
+	-- Animação Hover
 	frame.MouseEnter:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			BackgroundColor3 = Color3.fromRGB(38, 38, 38),
-			Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset - 2)
+		TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(28, 28, 28)
 		}):Play()
-	end)
-	frame.MouseLeave:Connect(function()
-		TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			BackgroundColor3 = Color3.fromRGB(25, 25, 25),
-			Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset + 2)
+
+		TweenService:Create(accent, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 0
+		}):Play()
+
+		TweenService:Create(glow, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {
+			BackgroundTransparency = 0.8
 		}):Play()
 	end)
 
-	-- Clique (efeito de depressão)
+	frame.MouseLeave:Connect(function()
+		TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+		}):Play()
+
+		TweenService:Create(accent, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 0.3
+		}):Play()
+
+		TweenService:Create(glow, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {
+			BackgroundTransparency = 1
+		}):Play()
+	end)
+
+	-- Efeito de clique (press down)
 	frame.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
 				Position = frame.Position + UDim2.new(0, 0, 0, 2)
 			}):Play()
 		end
 	end)
 	frame.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
 				Position = frame.Position - UDim2.new(0, 0, 0, 2)
 			}):Play()
 		end
@@ -624,127 +752,191 @@ function SawMillHub:CreateLabel(tab, text)
 end
 
 -----------------------------------------------------
--- Botão Profissional Moderno (Corrigido com :Set)
+-- Botão Premium Moderno (Estilo Rayfield Cinza/Preto)
 -----------------------------------------------------
 function SawMillHub:CreateButton(tab, text, callback)
 	if not self.Tabs[tab] then return end
 
-	local initialText = tostring(text or "")
+	local initialText = tostring(text or "Button")
+
+	-- Frame base (para sombra leve e profundidade)
+	local frame = create("Frame", {
+		Parent = self.Tabs[tab].Container,
+		Size = UDim2.new(1, -10, 0, 42),
+		BackgroundTransparency = 1,
+		ZIndex = 1
+	})
+
+	-- Sombra de fundo suave
+	local shadow = create("ImageLabel", {
+		Parent = frame,
+		Size = UDim2.new(1, 8, 1, 8),
+		Position = UDim2.new(0, -4, 0, -2),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://5028857084",
+		ImageColor3 = Color3.fromRGB(0, 0, 0),
+		ImageTransparency = 0.7,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(24, 24, 276, 276),
+		ZIndex = 0
+	})
 
 	-- Botão principal
 	local btn = create("TextButton", {
-		Parent = self.Tabs[tab].Container,
+		Parent = frame,
 		Text = initialText,
-		Size = UDim2.new(1, -10, 0, 40),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30), -- preto profissional
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(28, 28, 28), -- Preto grafite
 		TextColor3 = Color3.fromRGB(235, 235, 235),
-		Font = Enum.Font.Gotham,
+		Font = Enum.Font.GothamSemibold,
 		TextSize = 15,
 		AutoButtonColor = false,
-		ClipsDescendants = true
+		ClipsDescendants = true,
+		ZIndex = 2
 	})
-	create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 8)})
+	create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 10)})
 
-	-- Stroke discreto
+	-- Stroke com leve brilho metálico
 	local stroke = create("UIStroke", {
 		Parent = btn,
-		Color = Color3.fromRGB(60, 60, 60),
-		Thickness = 1,
-		Transparency = 0.5
+		Color = Color3.fromRGB(80, 80, 80),
+		Thickness = 1.2,
+		Transparency = 0.45
 	})
 
-	-- Hover Effect (PC e mobile)
+	-- Efeito hover (transição suave e discreta)
 	btn.MouseEnter:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		}):Play()
+
+		TweenService:Create(stroke, TweenInfo.new(0.25), {
+			Color = Color3.fromRGB(100, 100, 100),
+			Transparency = 0.3
 		}):Play()
 	end)
 
 	btn.MouseLeave:Connect(function()
-		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+		}):Play()
+
+		TweenService:Create(stroke, TweenInfo.new(0.25), {
+			Color = Color3.fromRGB(80, 80, 80),
+			Transparency = 0.45
 		}):Play()
 	end)
 
-	-- Click Feedback
+	-- Efeito de clique com feedback visual elegante
 	btn.MouseButton1Down:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.1), {
-			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-			TextColor3 = Color3.fromRGB(200, 200, 200)
+			BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+			TextColor3 = Color3.fromRGB(210, 210, 210)
 		}):Play()
 	end)
 
 	btn.MouseButton1Up:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.2), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+			BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 			TextColor3 = Color3.fromRGB(235, 235, 235)
 		}):Play()
 	end)
 
-	-- Execução do callback
+	-- Execução segura do callback
 	btn.MouseButton1Click:Connect(function()
-		if callback then pcall(callback) end
+		if callback then
+			task.spawn(function()
+				pcall(callback)
+			end)
+		end
 	end)
 
 	self:UpdateScrolling(tab)
 
 	return {
 		Button = btn,
-		Get = function() return btn.Text end,
-		Set = function(_, newText) btn.Text = tostring(newText) end
+		Set = function(_, newText)
+			btn.Text = tostring(newText)
+		end,
+		Get = function()
+			return btn.Text
+		end,
+		Destroy = function()
+			frame:Destroy()
+		end
 	}
 end
 
 function SawMillHub:CreateToggle(tab, text, default, callback)
 	local TweenService = game:GetService("TweenService")
 	local Debris = game:GetService("Debris")
-	local UserInputService = game:GetService("UserInputService")
 
 	if not self.Tabs[tab] then return end
 	local container = self.Tabs[tab].Container
 
-	local NEON_ON = Color3.fromRGB(0, 255, 120)
-	local NEON_OFF_BG = Color3.fromRGB(120, 30, 30)
-	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50)
-	local TEXT_COLOR_OFF = Color3.fromRGB(200, 200, 200)
+	-- Paleta profissional
+	local COLOR_ON = Color3.fromRGB(0, 255, 160)
+	local COLOR_OFF = Color3.fromRGB(40, 40, 40)
+	local GLOW_ON = Color3.fromRGB(0, 255, 160)
+	local GLOW_OFF = Color3.fromRGB(100, 100, 100)
+	local TEXT_ON = Color3.fromRGB(240, 240, 240)
+	local TEXT_OFF = Color3.fromRGB(180, 180, 180)
 
 	local currentState = default == true
+	local ON_POS = UDim2.new(1, -27, 0.5, -12)
+	local OFF_POS = UDim2.new(0, 2, 0.5, -12)
 
-	local ON_POS = UDim2.new(1, -25, 0.5, -12)
-	local OFF_POS = UDim2.new(0, 1, 0.5, -12)
-
+	-- Container principal
 	local toggle = create("Frame", {
 		Parent = container,
-		Size = UDim2.new(1, -10, 0, 44),
-		BackgroundTransparency = 1
+		Size = UDim2.new(1, -10, 0, 46),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		BorderSizePixel = 0,
+	})
+	create("UICorner", {Parent = toggle, CornerRadius = UDim.new(0, 10)})
+	create("UIStroke", {Parent = toggle, Color = Color3.fromRGB(70, 70, 70), Transparency = 0.4})
+
+	local shadow = create("ImageLabel", {
+		Parent = toggle,
+		Size = UDim2.new(1, 10, 1, 10),
+		Position = UDim2.new(0, -5, 0, -2),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://5028857084",
+		ImageColor3 = Color3.fromRGB(0, 0, 0),
+		ImageTransparency = 0.85,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(24, 24, 276, 276),
+		ZIndex = 0
 	})
 
+	-- Label
 	local label = create("TextLabel", {
 		Parent = toggle,
 		Size = UDim2.new(0.7, 0, 1, 0),
-		Position = UDim2.new(0, 10, 0, 0),
+		Position = UDim2.new(0, 14, 0, 0),
 		BackgroundTransparency = 1,
 		Text = text,
-		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = currentState and TEXT_ON or TEXT_OFF,
+		Font = Enum.Font.GothamSemibold,
 		TextSize = 16,
-		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF,
-		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
+	-- Switch
 	local switch = create("Frame", {
 		Parent = toggle,
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0.5, 0),
-		Size = UDim2.new(0, 55, 0, 26),
-		BackgroundColor3 = currentState and NEON_ON or NEON_OFF_BG,
-		BorderSizePixel = 0,
+		Position = UDim2.new(1, -14, 0.5, 0),
+		Size = UDim2.new(0, 60, 0, 28),
+		BackgroundColor3 = currentState and COLOR_ON or COLOR_OFF,
+		BorderSizePixel = 0
 	})
 	create("UICorner", {Parent = switch, CornerRadius = UDim.new(1, 0)})
 
 	local glow = create("UIStroke", {
 		Parent = switch,
-		Color = currentState and NEON_ON or NEON_OFF_GLOW,
-		Transparency = currentState and 0.25 or 0.5,
+		Color = currentState and GLOW_ON or GLOW_OFF,
+		Transparency = currentState and 0.25 or 0.55,
 		Thickness = 2
 	})
 
@@ -753,21 +945,22 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 		Size = UDim2.new(0, 24, 0, 24),
 		Position = currentState and ON_POS or OFF_POS,
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		BorderSizePixel = 0,
 	})
 	create("UICorner", {Parent = handle, CornerRadius = UDim.new(1, 0)})
 
-	local gradient = create("UIGradient", {
+	local reflection = create("UIGradient", {
 		Parent = handle,
 		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(230, 230, 230)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(210, 210, 210))
 		}),
-		Rotation = 30
+		Rotation = 45
 	})
+
 	task.spawn(function()
 		while handle.Parent do
-			gradient.Rotation = (gradient.Rotation + 0.6) % 360
+			reflection.Rotation = (reflection.Rotation + 0.4) % 360
 			task.wait(0.016)
 		end
 	end)
@@ -779,11 +972,12 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 			Position = UDim2.new(0.5, 0, 0.5, 0),
 			Size = UDim2.new(0.9, 0, 0.9, 0),
 			BackgroundColor3 = color,
-			BackgroundTransparency = 0.7,
-			BorderSizePixel = 0,
-			ZIndex = -1
+			BackgroundTransparency = 0.6,
+			ZIndex = -1,
+			BorderSizePixel = 0
 		})
 		create("UICorner", {Parent = pulse, CornerRadius = UDim.new(1, 0)})
+
 		TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			Size = UDim2.new(1.8, 0, 1.8, 0),
 			BackgroundTransparency = 1
@@ -794,40 +988,36 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 	local function updateToggle(state, triggerCallback)
 		currentState = state
 
-		local colorBG = state and NEON_ON or NEON_OFF_BG
-		local colorGlow = state and NEON_ON or NEON_OFF_GLOW
-		local colorText = state and NEON_ON or TEXT_COLOR_OFF
+		local colorBG = state and COLOR_ON or COLOR_OFF
+		local colorGlow = state and GLOW_ON or GLOW_OFF
+		local colorText = state and TEXT_ON or TEXT_OFF
 
 		TweenService:Create(switch, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundColor3 = colorBG}):Play()
-		TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow, Transparency = state and 0.25 or 0.5}):Play()
+		TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow, Transparency = state and 0.25 or 0.55}):Play()
 		TweenService:Create(label, TweenInfo.new(0.25), {TextColor3 = colorText}):Play()
-		TweenService:Create(handle, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and ON_POS or OFF_POS}):Play()
+		TweenService:Create(handle, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Position = state and ON_POS or OFF_POS
+		}):Play()
 
 		createPulse(colorGlow)
-
 		if callback and triggerCallback then
 			task.spawn(callback, currentState)
 		end
 	end
 
-	-- Clique compatível PC + Touch
-	local function onToggle()
-		updateToggle(not currentState, true)
-	end
-
 	switch.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			onToggle()
+			updateToggle(not currentState, true)
 		end
 	end)
 
 	self:UpdateScrolling(tab)
 
 	local toggleObject = {}
-	function toggleObject:Set(state) updateToggle(state, true) end
-	function toggleObject:Get() return currentState end
 	toggleObject.Frame = toggle
 	toggleObject.Switch = switch
+	-- Só Set, callback é disparado automaticamente
+	function toggleObject:Set(state) updateToggle(state, true) end
 
 	return toggleObject
 end
@@ -842,7 +1032,6 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 
 	local neonBlue = NEON_BLUE
 	local darkBackground = Color3.fromRGB(25, 25, 25)
-	local selectedBackground = Color3.fromRGB(40, 40, 40)
 	local optionBackground = Color3.fromRGB(35, 35, 35)
 	local optionHover = Color3.fromRGB(50, 50, 50)
 
@@ -916,7 +1105,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	local selectedCheck = nil
 
 	-----------------------------------------------------
-	-- Atualização dinâmica do Canvas e tamanho do dropdown
+	-- Atualização automática do dropdown
 	-----------------------------------------------------
 	local function updateDropdownSize(animated)
 		local layout = list:FindFirstChildOfClass("UIListLayout")
@@ -990,7 +1179,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	end
 
 	-----------------------------------------------------
-	-- Criar uma opção
+	-- Criar opção
 	-----------------------------------------------------
 	local function createOption(opt)
 		if optionMap[opt] then return end
@@ -1046,36 +1235,50 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	end
 
 	-----------------------------------------------------
-	-- Remover opção
-	-----------------------------------------------------
-	local function removeOption(opt)
-		local item = optionMap[opt]
-		if item then
-			item.Button:Destroy()
-			optionMap[opt] = nil
-			if selectedValue == opt then
-				selectedValue = nil
-				btnLabel.Text = text .. ": (Selecione)"
-			end
-			updateDropdownSize(true)
-		end
-	end
-
-	-----------------------------------------------------
-	-- Setar lista de opções
+	-- Setar lista de opções preservando scroll
 	-----------------------------------------------------
 	local function setOptions(newOptions)
-		for opt, item in pairs(optionMap) do
-			item.Button:Destroy()
-		end
+		local currentScroll = list.CanvasPosition.Y -- salva posição atual
+		local oldOptionMap = optionMap
 		optionMap = {}
-		options = newOptions
-		for _, opt in ipairs(options) do
+
+		local added = {}
+		local removed = {}
+
+		-- Identifica opções novas e removidas
+		local lookupNew = {}
+		for _, opt in ipairs(newOptions) do lookupNew[opt] = true end
+		for opt, _ in pairs(oldOptionMap) do
+			if not lookupNew[opt] then
+				removed[#removed + 1] = opt
+			else
+				-- mantém item existente
+				optionMap[opt] = oldOptionMap[opt]
+			end
+		end
+		for _, opt in ipairs(newOptions) do
+			if not optionMap[opt] then
+				added[#added + 1] = opt
+			end
+		end
+
+		-- Remove opções que não existem mais
+		for _, opt in ipairs(removed) do
+			oldOptionMap[opt].Button:Destroy()
+		end
+
+		-- Cria opções novas
+		for _, opt in ipairs(added) do
 			createOption(opt)
 		end
-		btnLabel.Text = text .. ": (Selecione)"
-		selectedValue = nil
+
+		options = newOptions
 		updateDropdownSize(true)
+
+		-- restaura scroll suavemente
+		task.defer(function()
+			list.CanvasPosition = Vector2.new(0, currentScroll)
+		end)
 	end
 
 	-----------------------------------------------------
@@ -1088,14 +1291,11 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	self:UpdateScrolling(self.Tabs[tab])
 
 	return {
-		Frame = frame,
-		Get = function() return selectedValue end,
-		Set = function(_, optionName) selectOption(optionName) end,
-		AddOption = function(_, optionName) createOption(optionName) end,
-		RemoveOption = function(_, optionName) removeOption(optionName) end,
-		SetOptions = function(_, newOptions) setOptions(newOptions) end
+		SetOptions = function(_, newOptions) setOptions(newOptions) end,
+		Frame = frame
 	}
 end
+
 
 
 function SawMillHub:CreateInput(tab, text, placeholder, callback)
