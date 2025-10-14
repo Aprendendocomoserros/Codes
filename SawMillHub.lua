@@ -700,34 +700,51 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
     if not self.Tabs[tab] then return end
     local container = self.Tabs[tab].Container
 
-    -- Cores
+    -- Cores neon
     local NEON_ON = Color3.fromRGB(0, 255, 120)
-    local NEON_OFF_BG = Color3.fromRGB(40, 40, 40)
+    local NEON_OFF_BG = Color3.fromRGB(30, 30, 30)
     local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50)
     local TEXT_COLOR_OFF = Color3.fromRGB(180, 180, 180)
 
     local currentState = default == true
-
     local ON_POS = UDim2.new(1, -25, 0.5, -12)
     local OFF_POS = UDim2.new(0, 1, 0.5, -12)
 
-    -- Container principal do toggle
+    -- Container do toggle
     local toggle = Instance.new("Frame")
     toggle.Parent = container
     toggle.Size = UDim2.new(1, -10, 0, 44)
     toggle.BackgroundTransparency = 1
 
-    -- Label
+    -- Label com fundo animado
     local label = Instance.new("TextLabel")
     label.Parent = toggle
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
+    label.BackgroundTransparency = 0.85
+    label.BackgroundColor3 = Color3.fromRGB(20,20,20)
     label.Text = text
     label.Font = Enum.Font.GothamBold
     label.TextSize = 16
     label.TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF
     label.TextXAlignment = Enum.TextXAlignment.Left
+    local labelCorner = Instance.new("UICorner", label)
+    labelCorner.CornerRadius = UDim.new(0.25,0)
+
+    -- Fundo animado do label (gradiente em movimento)
+    local labelGradient = Instance.new("UIGradient", label)
+    labelGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 120)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 120, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 200))
+    }
+    labelGradient.Rotation = 0
+    task.spawn(function()
+        while label.Parent do
+            labelGradient.Rotation = (labelGradient.Rotation + 1) % 360
+            task.wait(0.016)
+        end
+    end)
 
     -- Switch principal
     local switch = Instance.new("Frame")
@@ -740,12 +757,22 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
     local switchCorner = Instance.new("UICorner", switch)
     switchCorner.CornerRadius = UDim.new(1, 0)
 
-    -- Glow
+    -- Glow pulsante contínuo
     local glow = Instance.new("UIStroke")
     glow.Parent = switch
     glow.Color = currentState and NEON_ON or NEON_OFF_GLOW
-    glow.Transparency = currentState and 0.25 or 0.5
-    glow.Thickness = 2
+    glow.Transparency = 0.3
+    glow.Thickness = 3
+    task.spawn(function()
+        local increment = 0.02
+        local direction = 1
+        while glow.Parent do
+            glow.Transparency = glow.Transparency + (increment * direction)
+            if glow.Transparency >= 0.5 then direction = -1
+            elseif glow.Transparency <= 0.2 then direction = 1 end
+            task.wait(0.016)
+        end
+    end)
 
     -- Handle
     local handle = Instance.new("Frame")
@@ -761,17 +788,17 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
     local gradient = Instance.new("UIGradient", handle)
     gradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200,200,255))
     })
     gradient.Rotation = 30
     task.spawn(function()
         while handle.Parent do
-            gradient.Rotation = (gradient.Rotation + 0.6) % 360
+            gradient.Rotation = (gradient.Rotation + 0.8) % 360
             task.wait(0.016)
         end
     end)
 
-    -- Função de pulso
+    -- Pulso ao ativar
     local function createPulse(color)
         local pulse = Instance.new("Frame")
         pulse.Parent = switch
@@ -784,14 +811,14 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
         pulse.ZIndex = -1
         local pulseCorner = Instance.new("UICorner", pulse)
         pulseCorner.CornerRadius = UDim.new(1, 0)
-        TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1.8, 0, 1.8, 0),
+        TweenService:Create(pulse, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(2, 0, 2, 0),
             BackgroundTransparency = 1
         }):Play()
-        Debris:AddItem(pulse, 0.5)
+        Debris:AddItem(pulse, 0.6)
     end
 
-    -- Atualiza estado do toggle
+    -- Atualiza estado
     local function updateToggle(state, triggerCallback)
         currentState = state
 
@@ -800,7 +827,7 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
         local colorText = state and NEON_ON or TEXT_COLOR_OFF
 
         TweenService:Create(switch, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundColor3 = colorBG}):Play()
-        TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow, Transparency = state and 0.25 or 0.5}):Play()
+        TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow}):Play()
         TweenService:Create(label, TweenInfo.new(0.25), {TextColor3 = colorText}):Play()
         TweenService:Create(handle, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and ON_POS or OFF_POS}):Play()
 
@@ -811,7 +838,7 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
         end
     end
 
-    -- Clique compatível PC + Touch
+    -- Clique PC + Touch
     local function onToggle()
         updateToggle(not currentState, true)
     end
@@ -822,9 +849,9 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
         end
     end)
 
-    -- Hover sutil
+    -- Hover suave
     switch.MouseEnter:Connect(function()
-        TweenService:Create(switch, TweenInfo.new(0.15), {BackgroundTransparency = 0.8}):Play()
+        TweenService:Create(switch, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
     end)
     switch.MouseLeave:Connect(function()
         TweenService:Create(switch, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
@@ -840,7 +867,6 @@ function SawMillHub:CreateToggle(tab, text, default, callback)
 
     return toggleObject
 end
-
 -----------------------------------------------------
 -- Dropdown Profissional Moderno (sem Get, só Set)
 -----------------------------------------------------
