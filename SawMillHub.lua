@@ -693,142 +693,153 @@ function SawMillHub:CreateButton(tab, text, callback)
 end
 
 function SawMillHub:CreateToggle(tab, text, default, callback)
-	local TweenService = game:GetService("TweenService")
-	local Debris = game:GetService("Debris")
-	local UserInputService = game:GetService("UserInputService")
+    local TweenService = game:GetService("TweenService")
+    local Debris = game:GetService("Debris")
+    local UserInputService = game:GetService("UserInputService")
 
-	if not self.Tabs[tab] then return end
-	local container = self.Tabs[tab].Container
+    if not self.Tabs[tab] then return end
+    local container = self.Tabs[tab].Container
 
-	local NEON_ON = Color3.fromRGB(0, 255, 120)
-	local NEON_OFF_BG = Color3.fromRGB(120, 30, 30)
-	local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50)
-	local TEXT_COLOR_OFF = Color3.fromRGB(200, 200, 200)
+    -- Cores
+    local NEON_ON = Color3.fromRGB(0, 255, 120)
+    local NEON_OFF_BG = Color3.fromRGB(40, 40, 40)
+    local NEON_OFF_GLOW = Color3.fromRGB(255, 50, 50)
+    local TEXT_COLOR_OFF = Color3.fromRGB(180, 180, 180)
 
-	local currentState = default == true
+    local currentState = default == true
 
-	local ON_POS = UDim2.new(1, -25, 0.5, -12)
-	local OFF_POS = UDim2.new(0, 1, 0.5, -12)
+    local ON_POS = UDim2.new(1, -25, 0.5, -12)
+    local OFF_POS = UDim2.new(0, 1, 0.5, -12)
 
-	local toggle = create("Frame", {
-		Parent = container,
-		Size = UDim2.new(1, -10, 0, 44),
-		BackgroundTransparency = 1
-	})
+    -- Container principal do toggle
+    local toggle = Instance.new("Frame")
+    toggle.Parent = container
+    toggle.Size = UDim2.new(1, -10, 0, 44)
+    toggle.BackgroundTransparency = 1
 
-	local label = create("TextLabel", {
-		Parent = toggle,
-		Size = UDim2.new(0.7, 0, 1, 0),
-		Position = UDim2.new(0, 10, 0, 0),
-		BackgroundTransparency = 1,
-		Text = text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 16,
-		TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
+    -- Label
+    local label = Instance.new("TextLabel")
+    label.Parent = toggle
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 16
+    label.TextColor3 = currentState and NEON_ON or TEXT_COLOR_OFF
+    label.TextXAlignment = Enum.TextXAlignment.Left
 
-	local switch = create("Frame", {
-		Parent = toggle,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0.5, 0),
-		Size = UDim2.new(0, 55, 0, 26),
-		BackgroundColor3 = currentState and NEON_ON or NEON_OFF_BG,
-		BorderSizePixel = 0,
-	})
-	create("UICorner", {Parent = switch, CornerRadius = UDim.new(1, 0)})
+    -- Switch principal
+    local switch = Instance.new("Frame")
+    switch.Parent = toggle
+    switch.AnchorPoint = Vector2.new(1, 0.5)
+    switch.Position = UDim2.new(1, -10, 0.5, 0)
+    switch.Size = UDim2.new(0, 55, 0, 26)
+    switch.BackgroundColor3 = currentState and NEON_ON or NEON_OFF_BG
+    switch.BorderSizePixel = 0
+    local switchCorner = Instance.new("UICorner", switch)
+    switchCorner.CornerRadius = UDim.new(1, 0)
 
-	local glow = create("UIStroke", {
-		Parent = switch,
-		Color = currentState and NEON_ON or NEON_OFF_GLOW,
-		Transparency = currentState and 0.25 or 0.5,
-		Thickness = 2
-	})
+    -- Glow
+    local glow = Instance.new("UIStroke")
+    glow.Parent = switch
+    glow.Color = currentState and NEON_ON or NEON_OFF_GLOW
+    glow.Transparency = currentState and 0.25 or 0.5
+    glow.Thickness = 2
 
-	local handle = create("Frame", {
-		Parent = switch,
-		Size = UDim2.new(0, 24, 0, 24),
-		Position = currentState and ON_POS or OFF_POS,
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		BorderSizePixel = 0,
-	})
-	create("UICorner", {Parent = handle, CornerRadius = UDim.new(1, 0)})
+    -- Handle
+    local handle = Instance.new("Frame")
+    handle.Parent = switch
+    handle.Size = UDim2.new(0, 24, 0, 24)
+    handle.Position = currentState and ON_POS or OFF_POS
+    handle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    handle.BorderSizePixel = 0
+    local handleCorner = Instance.new("UICorner", handle)
+    handleCorner.CornerRadius = UDim.new(1, 0)
 
-	local gradient = create("UIGradient", {
-		Parent = handle,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
-		}),
-		Rotation = 30
-	})
-	task.spawn(function()
-		while handle.Parent do
-			gradient.Rotation = (gradient.Rotation + 0.6) % 360
-			task.wait(0.016)
-		end
-	end)
+    -- Gradiente animado no handle
+    local gradient = Instance.new("UIGradient", handle)
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
+    })
+    gradient.Rotation = 30
+    task.spawn(function()
+        while handle.Parent do
+            gradient.Rotation = (gradient.Rotation + 0.6) % 360
+            task.wait(0.016)
+        end
+    end)
 
-	local function createPulse(color)
-		local pulse = create("Frame", {
-			Parent = switch,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.5, 0),
-			Size = UDim2.new(0.9, 0, 0.9, 0),
-			BackgroundColor3 = color,
-			BackgroundTransparency = 0.7,
-			BorderSizePixel = 0,
-			ZIndex = -1
-		})
-		create("UICorner", {Parent = pulse, CornerRadius = UDim.new(1, 0)})
-		TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = UDim2.new(1.8, 0, 1.8, 0),
-			BackgroundTransparency = 1
-		}):Play()
-		Debris:AddItem(pulse, 0.5)
-	end
+    -- Função de pulso
+    local function createPulse(color)
+        local pulse = Instance.new("Frame")
+        pulse.Parent = switch
+        pulse.AnchorPoint = Vector2.new(0.5, 0.5)
+        pulse.Position = UDim2.new(0.5, 0, 0.5, 0)
+        pulse.Size = UDim2.new(0.9, 0, 0.9, 0)
+        pulse.BackgroundColor3 = color
+        pulse.BackgroundTransparency = 0.7
+        pulse.BorderSizePixel = 0
+        pulse.ZIndex = -1
+        local pulseCorner = Instance.new("UICorner", pulse)
+        pulseCorner.CornerRadius = UDim.new(1, 0)
+        TweenService:Create(pulse, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1.8, 0, 1.8, 0),
+            BackgroundTransparency = 1
+        }):Play()
+        Debris:AddItem(pulse, 0.5)
+    end
 
-	local function updateToggle(state, triggerCallback)
-		currentState = state
+    -- Atualiza estado do toggle
+    local function updateToggle(state, triggerCallback)
+        currentState = state
 
-		local colorBG = state and NEON_ON or NEON_OFF_BG
-		local colorGlow = state and NEON_ON or NEON_OFF_GLOW
-		local colorText = state and NEON_ON or TEXT_COLOR_OFF
+        local colorBG = state and NEON_ON or NEON_OFF_BG
+        local colorGlow = state and NEON_ON or NEON_OFF_GLOW
+        local colorText = state and NEON_ON or TEXT_COLOR_OFF
 
-		TweenService:Create(switch, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundColor3 = colorBG}):Play()
-		TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow, Transparency = state and 0.25 or 0.5}):Play()
-		TweenService:Create(label, TweenInfo.new(0.25), {TextColor3 = colorText}):Play()
-		TweenService:Create(handle, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and ON_POS or OFF_POS}):Play()
+        TweenService:Create(switch, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundColor3 = colorBG}):Play()
+        TweenService:Create(glow, TweenInfo.new(0.25), {Color = colorGlow, Transparency = state and 0.25 or 0.5}):Play()
+        TweenService:Create(label, TweenInfo.new(0.25), {TextColor3 = colorText}):Play()
+        TweenService:Create(handle, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and ON_POS or OFF_POS}):Play()
 
-		createPulse(colorGlow)
+        createPulse(colorGlow)
 
-		if callback and triggerCallback then
-			task.spawn(callback, currentState)
-		end
-	end
+        if callback and triggerCallback then
+            task.spawn(callback, currentState)
+        end
+    end
 
-	-- Clique compatível PC + Touch
-	local function onToggle()
-		updateToggle(not currentState, true)
-	end
+    -- Clique compatível PC + Touch
+    local function onToggle()
+        updateToggle(not currentState, true)
+    end
 
-	switch.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			onToggle()
-		end
-	end)
+    switch.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            onToggle()
+        end
+    end)
 
-	self:UpdateScrolling(tab)
+    -- Hover sutil
+    switch.MouseEnter:Connect(function()
+        TweenService:Create(switch, TweenInfo.new(0.15), {BackgroundTransparency = 0.8}):Play()
+    end)
+    switch.MouseLeave:Connect(function()
+        TweenService:Create(switch, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+    end)
 
-	local toggleObject = {}
-	function toggleObject:Set(state) updateToggle(state, true) end
-	function toggleObject:Get() return currentState end
-	toggleObject.Frame = toggle
-	toggleObject.Switch = switch
+    self:UpdateScrolling(tab)
 
-	return toggleObject
+    local toggleObject = {}
+    function toggleObject:Set(state) updateToggle(state, true) end
+    function toggleObject:Get() return currentState end
+    toggleObject.Frame = toggle
+    toggleObject.Switch = switch
+
+    return toggleObject
 end
-
 
 -----------------------------------------------------
 -- Dropdown Profissional Moderno (sem Get, só Set)
