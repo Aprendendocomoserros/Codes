@@ -51,14 +51,14 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	create("UICorner",{Parent=resizeHandle,CornerRadius=UDim.new(0,4)})
 	create("UIStroke",{Parent=resizeHandle,Color=Color3.fromRGB(130,130,130),Thickness=1.2})
 
-	local resizing = false
+	local resizing=false
 	local startSize,startInputPos
 
 	resizeHandle.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			resizing=true
-			startSize = mainFrame.Size
-			startInputPos = input.Position
+			startSize=mainFrame.Size
+			startInputPos=input.Position
 			input.Changed:Connect(function()
 				if input.UserInputState==Enum.UserInputState.End then resizing=false end
 			end)
@@ -194,19 +194,13 @@ function SawMillHub.new(title, dragSpeed)
 	self.Tabs,self.Keybinds,self.Notifs={},{},{}
 	self.MaxNotifs=5
 
+	-- Função de animação para botões
 	local function animateButton(btn,baseColor,hoverColor)
-		btn.MouseEnter:Connect(function()
-			tween(btn,0.15,{BackgroundColor3=hoverColor,Size=UDim2.new(0,36,0,36)})
-		end)
-		btn.MouseLeave:Connect(function()
-			tween(btn,0.15,{BackgroundColor3=baseColor,Size=UDim2.new(0,32,0,32)})
-		end)
-		btn.MouseButton1Down:Connect(function()
-			tween(btn,0.1,{Size=UDim2.new(0,28,0,28)})
-		end)
-		btn.MouseButton1Up:Connect(function()
-			tween(btn,0.1,{Size=UDim2.new(0,32,0,32)})
-		end)
+		if not btn then return end
+		btn.MouseEnter:Connect(function() tween(btn,0.15,{BackgroundColor3=hoverColor,Size=UDim2.new(0,36,0,36)}) end)
+		btn.MouseLeave:Connect(function() tween(btn,0.15,{BackgroundColor3=baseColor,Size=UDim2.new(0,32,0,32)}) end)
+		btn.MouseButton1Down:Connect(function() tween(btn,0.1,{Size=UDim2.new(0,28,0,28)}) end)
+		btn.MouseButton1Up:Connect(function() tween(btn,0.1,{Size=UDim2.new(0,32,0,32)}) end)
 	end
 
 	-- MINIMIZE
