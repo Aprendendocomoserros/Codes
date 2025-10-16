@@ -589,195 +589,161 @@ end
 
 function SawMillHub:CreateSlider(tab, text, min, max, increment, default, callback)
 	if not self.Tabs[tab] then return end
+	local TweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local RunService = game:GetService("RunService")
+	local Debris = game:GetService("Debris")
 
 	min, max = tonumber(min) or 0, tonumber(max) or 100
-	increment = tonumber(increment) or 0
+	increment = tonumber(increment) or 1
 	default = math.clamp(default or min, min, max)
 	local currentValue = default
+	local dragging, draggingInput, lastUpdate = false, nil, 0
+	local throttle = 1/120
 
-	local function roundIncrement(val)
-		if increment > 0 then
-			return math.clamp(math.floor((val + increment/2) / increment) * increment, min, max)
-		else
-			return math.clamp(val, min, max)
-		end
+	local function roundIncrement(v)
+		if increment>0 then return math.clamp(math.floor((v+increment/2)/increment)*increment, min, max) else return math.clamp(v, min, max) end
 	end
 
-	-- ===== Frame principal =====
-	local frame = create("Frame", {
-		Parent = self.Tabs[tab].Container,
-		Size = UDim2.new(1, -10, 0, 70),
-		BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-	})
-	create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 14)})
-	create("UIStroke", {Parent = frame, Color = Color3.fromRGB(60, 60, 60), Thickness = 1, Transparency = 0.4})
+	-- FRAME
+	local frame = create("Frame",{Parent=self.Tabs[tab].Container,Size=UDim2.new(1,-10,0,60),BackgroundColor3=Color3.fromRGB(18,18,28)})
+	create("UICorner",{Parent=frame,CornerRadius=UDim.new(0,12)})
+	create("UIStroke",{Parent=frame,Color=Color3.fromRGB(40,40,60),Transparency=0.5,Thickness=1})
 
-	-- ===== Label =====
-	local lbl = create("TextLabel", {
-		Parent = frame,
-		Text = string.format("%s: %d", text, default),
-		Size = UDim2.new(0.75, 0, 0, 22),
-		Position = UDim2.new(0, 12, 0, 8),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(240, 240, 240),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Font = Enum.Font.GothamBold,
-		TextSize = 16
-	})
+	-- LABEL
+	local lbl = create("TextLabel",{Parent=frame,Text=string.format("%s: %d",text,default),Position=UDim2.new(0,14,0,6),Size=UDim2.new(1,-100,0,20),BackgroundTransparency=1,TextColor3=Color3.fromRGB(180,120,255),Font=Enum.Font.GothamSemibold,TextSize=15,TextXAlignment=Enum.TextXAlignment.Left})
 
-	-- ===== Input circular =====
-	local inputCircle = create("TextBox", {
-		Parent = frame,
-		Size = UDim2.new(0, 44, 0, 44),
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -12, 0, 8),
-		Text = tostring(default),
-		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
-		TextColor3 = Color3.fromRGB(230, 230, 230),
-		Font = Enum.Font.GothamBold,
-		TextSize = 15,
-		ClearTextOnFocus = false
-	})
-	create("UICorner", {Parent = inputCircle, CornerRadius = UDim.new(1, 0)})
-	create("UIStroke", {Parent = inputCircle, Color = Color3.fromRGB(80, 80, 80), Thickness = 1, Transparency = 0.5})
+	-- INPUT BOX
+	local inputBox = create("TextBox",{Parent=frame,Size=UDim2.new(0,52,0,26),AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,-8,0,6),Text=tostring(default),BackgroundColor3=Color3.fromRGB(28,28,40),TextColor3=Color3.fromRGB(180,120,255),Font=Enum.Font.GothamBold,TextSize=14,ClearTextOnFocus=false})
+	create("UICorner",{Parent=inputBox,CornerRadius=UDim.new(0,7)})
+	create("UIStroke",{Parent=inputBox,Color=Color3.fromRGB(120,80,255),Transparency=0.5,Thickness=1})
 
-	-- ===== Barra =====
-	local bar = create("Frame", {
-		Parent = frame,
-		Size = UDim2.new(1, -70, 0, 14),
-		Position = UDim2.new(0, 12, 0, 44),
-		BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	})
-	create("UICorner", {Parent = bar, CornerRadius = UDim.new(0, 7)})
+	-- BAR
+	local bar = create("Frame",{Parent=frame,Position=UDim2.new(0,14,0,36),Size=UDim2.new(1,-28,0,10),BackgroundColor3=Color3.fromRGB(25,25,35)})
+	create("UICorner",{Parent=bar,CornerRadius=UDim.new(0,5)})
+	local track = create("Frame",{Parent=bar,Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(20,20,30),ZIndex=1})
+	create("UICorner",{Parent=track,CornerRadius=UDim.new(0,5)})
 
-	-- Glow da barra
-	local barGlow = create("Frame", {
-		Parent = bar,
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundColor3 = Color3.fromRGB(100, 100, 255),
-		BackgroundTransparency = 0.7,
-		ZIndex = 1
-	})
-	create("UICorner", {Parent = barGlow, CornerRadius = UDim.new(0, 7)})
+	local hitbox = create("TextButton",{Parent=bar,Size=UDim2.new(1,20,2,0),Position=UDim2.new(0,-10,0,-5),BackgroundTransparency=1,AutoButtonColor=false,Text=""})
+	hitbox.ZIndex = 6
 
-	-- ===== Fill =====
-	local fill = create("Frame", {
-		Parent = bar,
-		Size = UDim2.new((default-min)/(max-min), 0, 1, 0),
-		BackgroundColor3 = Color3.fromRGB(100, 100, 255),
-		ZIndex = 2
-	})
-	create("UICorner", {Parent = fill, CornerRadius = UDim.new(0, 7)})
+	-- FILL
+	local fill = create("Frame",{Parent=bar,Size=UDim2.new((default-min)/(max-min),0,1,0),BackgroundColor3=Color3.fromRGB(120,80,255),ZIndex=3})
+	create("UICorner",{Parent=fill,CornerRadius=UDim.new(0,5)})
+	local fillGrad = create("UIGradient",{Parent=fill,Color=ColorSequence.new{
+		ColorSequenceKeypoint.new(0,Color3.fromRGB(120,80,255)),
+		ColorSequenceKeypoint.new(0.5,Color3.fromRGB(60,60,180)),
+		ColorSequenceKeypoint.new(1,Color3.fromRGB(40,40,120))
+	},Rotation=0})
 
-	-- ===== Thumb =====
-	local thumb = create("Frame", {
-		Parent = bar,
-		Size = UDim2.new(0, 24, 0, 24),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(fill.Size.X.Scale, 0, 0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(120, 120, 255),
-		ZIndex = 3
-	})
-	create("UICorner", {Parent = thumb, CornerRadius = UDim.new(1, 0)})
-	create("UIStroke", {Parent = thumb, Color = Color3.fromRGB(80, 80, 150), Thickness = 1, Transparency = 0.3})
+	-- THUMB
+	local thumb = create("Frame",{Parent=bar,Size=UDim2.new(0,20,0,20),Position=UDim2.new(fill.Size.X.Scale,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),BackgroundColor3=Color3.fromRGB(200,150,255),ZIndex=7})
+	create("UICorner",{Parent=thumb,CornerRadius=UDim.new(1,0)})
+	create("UIStroke",{Parent=thumb,Color=Color3.fromRGB(150,100,255),Transparency=0.3,Thickness=1})
+	local thumbGlow = create("ImageLabel",{Parent=thumb,Size=UDim2.new(3,0,3,0),Position=UDim2.new(0.5,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),Image="rbxassetid://5028857084",BackgroundTransparency=1,ImageTransparency=0.7,ImageColor3=Color3.fromRGB(180,120,255),ZIndex=1})
 
-	-- Sombra premium
-	local thumbShadow = create("Frame", {
-		Parent = thumb,
-		Size = UDim2.new(1.8, 0, 1.8, 0),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(50, 50, 100),
-		BackgroundTransparency = 0.8,
-		ZIndex = 0
-	})
-	create("UICorner", {Parent = thumbShadow, CornerRadius = UDim.new(1, 0)})
+	-- TOOLTIP
+	local tooltip = create("TextLabel",{Parent=frame,Size=UDim2.new(0,64,0,28),BackgroundColor3=Color3.fromRGB(18,18,28),BackgroundTransparency=0.85,BorderSizePixel=0,AnchorPoint=Vector2.new(0.5,1),Position=UDim2.new(fill.Size.X.Scale,0,0,14),Text=tostring(default),TextColor3=Color3.fromRGB(200,150,255),Font=Enum.Font.GothamBold,TextSize=13,ZIndex=10,Visible=false})
+	create("UICorner",{Parent=tooltip,CornerRadius=UDim.new(0,8)})
 
-	local dragging = false
-
-	-- ===== Partículas premium =====
-	local function spawnParticle()
-		local p = create("Frame", {
-			Parent = bar,
-			Size = UDim2.new(0, 6, 0, 6),
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-			Position = UDim2.new(fill.Size.X.Scale, 0, 0.5, 0),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 0.7,
-			ZIndex = 5
-		})
-		create("UICorner", {Parent = p, CornerRadius = UDim.new(0, 3)})
-		tween(p, 0.4, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, Position = UDim2.new(fill.Size.X.Scale, 0, 0.5, 0)})
-		task.delay(0.4, function() p:Destroy() end)
+	-- PARTICLES & PULSE
+	local function spawnParticle(pct)
+		local p = create("Frame",{Parent=bar,Size=UDim2.new(0,6,0,6),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(pct,0,0.5,0),BackgroundColor3=Color3.fromRGB(200,150,255),BackgroundTransparency=0.1,ZIndex=8})
+		create("UICorner",{Parent=p,CornerRadius=UDim.new(1,0)})
+		TweenService:Create(p,TweenInfo.new(0.4,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(0,0,0,0),BackgroundTransparency=1}):Play()
+		task.delay(0.4,function() p:Destroy() end)
+	end
+	local function pulse(positionUDim)
+		local p = create("ImageLabel",{Parent=bar,Image="rbxassetid://5028857084",Size=UDim2.new(0,0,0,0),AnchorPoint=Vector2.new(0.5,0.5),Position=positionUDim,ImageColor3=fill.BackgroundColor3,BackgroundTransparency=1,ImageTransparency=0.35,ZIndex=5})
+		TweenService:Create(p,TweenInfo.new(0.44,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Size=UDim2.new(0,60,0,60),ImageTransparency=1}):Play()
+		task.delay(0.44,function() p:Destroy() end)
 	end
 
-	-- ===== Atualizar slider =====
-	local function updateSlider(val, instant, fromThumb)
-		if fromThumb then val = roundIncrement(val) else val = math.clamp(val, min, max) end
-		if val == currentValue then return end
-		currentValue = val
-		local pct = (val - min)/(max - min)
-
-		-- Fill animado
-		TweenService:Create(fill, TweenInfo.new(instant and 0 or 0.25, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Size = UDim2.new(pct, 0, 1, 0)}):Play()
-		TweenService:Create(thumb, TweenInfo.new(instant and 0 or 0.25, Enum.EasingStyle.Quad), {Position = UDim2.new(pct, 0, 0.5, 0)}):Play()
-
-		-- Label animado
-		TweenService:Create(lbl, TweenInfo.new(0.1), {TextTransparency = 0.3}):Play()
-		lbl.Text = string.format("%s: %d", text, val)
-		TweenService:Create(lbl, TweenInfo.new(0.1), {TextTransparency = 0}):Play()
-
-		inputCircle.Text = tostring(val)
-		spawnParticle()
-		if callback then task.spawn(callback, val) end
+	-- UPDATE
+	local function _update(val,instant,fromUser)
+		val = roundIncrement(val)
+		if val==currentValue and not instant then return end
+		currentValue=val
+		local pct = (max~=min) and (val-min)/(max-min) or 0
+		TweenService:Create(fill,TweenInfo.new((instant and 0 or 0.22),Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
+		TweenService:Create(thumb,TweenInfo.new((instant and 0 or 0.22),Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=UDim2.new(pct,0,0.5,0)}):Play()
+		lbl.Text=string.format("%s: %d",text,val)
+		inputBox.Text=tostring(val)
+		tooltip.Position=UDim2.new(pct,0,0,14)
+		tooltip.Text=tostring(val)
+		spawnParticle(pct)
+		pulse(UDim2.new(pct,0,0.5,0))
+		if callback then task.spawn(callback,val) end
 	end
 
-	inputCircle.FocusLost:Connect(function()
-		local num = tonumber(inputCircle.Text)
-		if num then updateSlider(num, true, false) else inputCircle.Text = tostring(currentValue) end
+	-- EVENTS
+	inputBox.FocusLost:Connect(function()
+		local n = tonumber(inputBox.Text)
+		if n then _update(n,true,true) else inputBox.Text=tostring(currentValue) end
 	end)
+	local function positionToValue(x)
+		local left, width = bar.AbsolutePosition.X, bar.AbsoluteSize.X
+		return math.clamp((x-left)/math.max(1,width),0,1)*(max-min)+min
+	end
 
-	bar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			updateSlider((input.Position.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X*(max-min)+min, false, true)
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
+	hitbox.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			dragging=true
+			draggingInput=input
+			tooltip.Visible=true
+			TweenService:Create(tooltip,TweenInfo.new(0.16,Enum.EasingStyle.Quad),{BackgroundTransparency=0.85,TextTransparency=0}):Play()
+			local pos=input.Position or UserInputService:GetMouseLocation()
+			_update(positionToValue(pos.X),false,true)
+			thumb.Size=UDim2.new(0,22,0,22)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			updateSlider((input.Position.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X*(max-min)+min, false, true)
+		if not dragging then return end
+		if input~=draggingInput then
+			if not (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then return end
+		end
+		if tick()-lastUpdate<throttle then return end
+		lastUpdate=tick()
+		local pos=input.Position or UserInputService:GetMouseLocation()
+		local newVal=positionToValue(pos.X)
+		_update(newVal,false,true)
+		tooltip.Text=tostring(roundIncrement(newVal))
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input==draggingInput or (dragging and (input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch)) then
+			dragging=false
+			draggingInput=nil
+			local pct=(max~=min) and (currentValue-min)/(max-min) or 0
+			pulse(UDim2.new(pct,0,0.5,0))
+			TweenService:Create(tooltip,TweenInfo.new(0.18,Enum.EasingStyle.Quad),{BackgroundTransparency=0.85,TextTransparency=0.9}):Play()
+			task.delay(0.2,function() tooltip.Visible=false end)
+			thumb.Size=UDim2.new(0,20,0,20)
 		end
 	end)
 
-	updateSlider(default, true, false)
+	thumb.MouseEnter:Connect(function()
+		TweenService:Create(thumb,TweenInfo.new(0.16,Enum.EasingStyle.Quad),{Size=UDim2.new(0,22,0,22)}):Play()
+	end)
+	thumb.MouseLeave:Connect(function()
+		if not dragging then
+			TweenService:Create(thumb,TweenInfo.new(0.16,Enum.EasingStyle.Quad),{Size=UDim2.new(0,20,0,20)}):Play()
+		end
+	end)
+
+	RunService.Heartbeat:Connect(function()
+		local hue = 0.75 + 0.12*math.sin(tick()*2)
+		local neon = Color3.fromHSV(hue,1,1)
+		fill.BackgroundColor3 = neon
+		lbl.TextColor3 = neon
+		thumbGlow.ImageColor3 = neon
+	end)
+
+	_update(default,true,false)
 	self:UpdateScrolling(tab)
 
-	-- ===== Rainbow Glow Premium =====
-	local hue = 0
-	RunService.Heartbeat:Connect(function(dt)
-		hue = (hue + dt*0.9) % 1
-		local rainbow = Color3.fromHSV(hue, 1, 1)
-		lbl.TextColor3 = rainbow
-		fill.BackgroundColor3 = rainbow
-		barGlow.BackgroundColor3 = rainbow
-		thumb.BackgroundColor3 = rainbow
-		inputCircle.TextColor3 = rainbow
-		thumbShadow.BackgroundTransparency = 0.6 + 0.2*math.sin(tick()*3)
-		thumb.BackgroundTransparency = 0.1 + 0.2*math.sin(tick()*3)
-	end)
-
-	return {
-		Set = function(_, newValue)
-			updateSlider(newValue, true, false)
-		end
-	}
+	return {Set=function(_,newValue) _update(newValue,true,false) end}
 end
 
 function SawMillHub:CreateLabel(tab, text)
@@ -895,54 +861,65 @@ function SawMillHub:CreateButton(tab, text, callback)
 	if not self.Tabs[tab] then return end
 
 	local initialText = tostring(text or "")
+	local TweenService = game:GetService("TweenService")
+	local RunService = game:GetService("RunService")
 
 	-- Botão principal
 	local btn = create("TextButton", {
 		Parent = self.Tabs[tab].Container,
 		Text = initialText,
 		Size = UDim2.new(1, -10, 0, 40),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+		BackgroundColor3 = Color3.fromRGB(28, 28, 38),
 		TextColor3 = Color3.fromRGB(235, 235, 235),
-		Font = Enum.Font.Gotham,
+		Font = Enum.Font.GothamBold,
 		TextSize = 15,
 		AutoButtonColor = false,
 		ClipsDescendants = true
 	})
-	create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 8)})
+	create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 10)})
 
-	-- Stroke discreto
+	-- Stroke animado
 	local stroke = create("UIStroke", {
 		Parent = btn,
-		Color = Color3.fromRGB(60, 60, 60),
-		Thickness = 1,
-		Transparency = 0.5
+		Color = Color3.fromRGB(70, 70, 100),
+		Thickness = 2,
+		Transparency = 0.4
 	})
 
-	-- Hover Effect
+	-- Glow interno
+	local glow = create("Frame", {
+		Parent = btn,
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		ZIndex = 0
+	})
+	create("UICorner", {Parent = glow, CornerRadius = UDim.new(0, 10)})
+
+	-- Hover Effect + Neon Pulse
 	btn.MouseEnter:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+			BackgroundColor3 = Color3.fromRGB(45, 45, 60)
 		}):Play()
 	end)
 
 	btn.MouseLeave:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+			BackgroundColor3 = Color3.fromRGB(28, 28, 38)
 		}):Play()
 	end)
 
 	-- Click Feedback
 	btn.MouseButton1Down:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.1), {
-			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-			TextColor3 = Color3.fromRGB(200, 200, 200)
+			BackgroundColor3 = Color3.fromRGB(20, 20, 28),
+			TextColor3 = Color3.fromRGB(200, 200, 255)
 		}):Play()
 	end)
 
 	btn.MouseButton1Up:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.2), {
-			BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-			TextColor3 = Color3.fromRGB(235, 235, 235)
+			BackgroundColor3 = Color3.fromRGB(45, 45, 60),
+			TextColor3 = Color3.fromRGB(235, 235, 255)
 		}):Play()
 	end)
 
@@ -951,16 +928,19 @@ function SawMillHub:CreateButton(tab, text, callback)
 		if callback then pcall(callback) end
 	end)
 
-	-- ===== RAINBOW NO STROKE =====
+	-- RAINBOW STROKE + Glow Neon Pulsante
 	local hue = 0
-	local conn
-	conn = RunService.RenderStepped:Connect(function(dt)
-		if not stroke or not stroke.Parent then
-			conn:Disconnect()
-			return
-		end
-		hue = (hue + dt * 0.1) % 1
-		stroke.Color = Color3.fromHSV(hue, 0.9, 1)
+	RunService.RenderStepped:Connect(function(dt)
+		hue = (hue + dt * 0.4) % 1
+		local neonColor = Color3.fromHSV(hue, 0.9, 1)
+		stroke.Color = neonColor
+		glow.BackgroundColor3 = neonColor
+		glow.BackgroundTransparency = 0.7 + 0.3 * math.sin(tick()*3)
+	end)
+
+	-- Pequeno pulse de texto
+	RunService.RenderStepped:Connect(function(dt)
+		btn.TextColor3 = btn.TextColor3:lerp(Color3.fromRGB(180, 120, 255), 0.05)
 	end)
 
 	self:UpdateScrolling(tab)
@@ -1174,12 +1154,15 @@ end
 function SawMillHub:CreateDropdown(tab, text, options, callback)
 	if not self.Tabs[tab] then return end
 	options = options or {}
+	local TweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local RunService = game:GetService("RunService")
 
-	local darkBackground = Color3.fromRGB(25, 25, 25)
-	local selectedBackground = Color3.fromRGB(40, 40, 40)
-	local optionBackground = Color3.fromRGB(35, 35, 35)
-	local optionHover = Color3.fromRGB(50, 50, 50)
-	local highlightColor = Color3.fromRGB(0, 170, 255)
+	local darkBackground = Color3.fromRGB(18, 18, 28)
+	local optionBackground = Color3.fromRGB(28, 28, 40)
+	local optionHover = Color3.fromRGB(50, 40, 80)
+	local highlightStart = Color3.fromRGB(180, 120, 255)
+	local highlightEnd = Color3.fromRGB(80, 120, 255)
 
 	local selectedValue = nil
 	local optionMap = {}
@@ -1193,7 +1176,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	frame.ClipsDescendants = true
 	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 	local frameStroke = Instance.new("UIStroke", frame)
-	frameStroke.Color = Color3.fromRGB(70, 70, 70)
+	frameStroke.Color = Color3.fromRGB(60, 60, 80)
 	frameStroke.Thickness = 1
 	frameStroke.Transparency = 0.5
 
@@ -1211,7 +1194,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	btnLabel.Size = UDim2.new(1, -60, 1, 0)
 	btnLabel.Position = UDim2.new(0, 14, 0, 0)
 	btnLabel.BackgroundTransparency = 1
-	btnLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+	btnLabel.TextColor3 = highlightStart
 	btnLabel.Font = Enum.Font.GothamBold
 	btnLabel.TextSize = 15
 	btnLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1223,7 +1206,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	arrow.AnchorPoint = Vector2.new(1, 0.5)
 	arrow.Position = UDim2.new(1, -12, 0.5, 0)
 	arrow.BackgroundTransparency = 1
-	arrow.TextColor3 = highlightColor
+	arrow.TextColor3 = highlightStart
 	arrow.Font = Enum.Font.GothamBlack
 	arrow.TextSize = 22
 	arrow.ZIndex = 2
@@ -1233,16 +1216,16 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	list.Parent = frame
 	list.Size = UDim2.new(1, 0, 0, 0)
 	list.Position = UDim2.new(0, 0, 0, 50)
-	list.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	list.BackgroundColor3 = optionBackground
 	list.Visible = false
 	list.ScrollBarThickness = 6
 	list.CanvasSize = UDim2.new(0, 0, 0, 0)
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	Instance.new("UICorner", list).CornerRadius = UDim.new(0, 10)
 	local listStroke = Instance.new("UIStroke", list)
-	listStroke.Color = highlightColor
+	listStroke.Color = highlightStart
 	listStroke.Thickness = 1
-	listStroke.Transparency = 0.8
+	listStroke.Transparency = 0.7
 
 	local layout = Instance.new("UIListLayout", list)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -1317,7 +1300,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		lbl.Size = UDim2.new(1, -50, 1, 0)
 		lbl.Position = UDim2.new(0, 12, 0, 0)
 		lbl.BackgroundTransparency = 1
-		lbl.TextColor3 = Color3.fromRGB(235, 235, 235)
+		lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
 		lbl.Font = Enum.Font.Gotham
 		lbl.TextSize = 15
 		lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1329,7 +1312,7 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 		check.AnchorPoint = Vector2.new(1, 0.5)
 		check.Position = UDim2.new(1, -12, 0.5, 0)
 		check.BackgroundTransparency = 1
-		check.TextColor3 = highlightColor
+		check.TextColor3 = highlightStart
 		check.Font = Enum.Font.GothamBlack
 		check.TextSize = 22
 		check.Visible = false
@@ -1366,6 +1349,21 @@ function SawMillHub:CreateDropdown(tab, text, options, callback)
 	-- INICIALIZAÇÃO
 	dropdown.Frame = frame
 	dropdown:Set(options)
+
+	-- ANIMAÇÃO PREMIUM: neon pulse + gradiente colorido
+	RunService.Heartbeat:Connect(function()
+		local pulse = 0.5 + 0.5 * math.sin(tick()*2)
+		local hue = 0.75 + 0.12*math.sin(tick())
+		local neon = Color3.fromHSV(hue, 1, 1)
+		btnLabel.TextColor3 = neon:Lerp(highlightEnd, pulse)
+		arrow.TextColor3 = neon:Lerp(highlightEnd, pulse)
+		for _, v in pairs(optionMap) do
+			if v.Check.Visible then
+				v.Check.TextColor3 = neon:Lerp(highlightEnd, pulse)
+			end
+		end
+	end)
+
 	self:UpdateScrolling(tab)
 	return dropdown
 end
