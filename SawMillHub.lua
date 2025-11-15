@@ -1,4 +1,6 @@
--- SawMillHub.lua (LocalScript)
+--========================================================--
+-- SawMillHub.lua – Hub Completo, Otimizado e Auto-Replace
+--========================================================--
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -8,355 +10,208 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
---------------------------------------------------------------------
--- 🔥 SISTEMA PARA REMOVER HUB ANTIGO SE OUTRO FOR CRIADO
---------------------------------------------------------------------
-do
-    local old = PlayerGui:FindFirstChild("SawMillHub")
-
-    if old then
-        local objVal = old:FindFirstChild("SawMillHubObject")
-
-        if objVal and objVal.Value and objVal.Value.OnClose then
-            pcall(function()
-                objVal.Value.OnClose:Fire()
-            end)
-        end
-
-        old:Destroy()
-    end
+----------------------------------------------------------------
+--  REMOVE O HUB ANTIGO ANTES DE CRIAR UM NOVO
+----------------------------------------------------------------
+for _, gui in ipairs(PlayerGui:GetChildren()) do
+	if gui:IsA("ScreenGui") and gui.Name == "SawMillHub" then
+		local obj = gui:FindFirstChild("SawMillHubObject")
+		if obj and obj.Value and obj.Value.Close then
+			pcall(function() obj.Value:Close() end)
+		end
+		gui:Destroy()
+	end
 end
---------------------------------------------------------------------
 
-local SawMillHub = {}
-SawMillHub.__index = SawMillHub
-
--- ======== FUNÇÕES AUXILIARES ========
-
+----------------------------------------------------------------
+-- FERRAMENTAS
+----------------------------------------------------------------
 local function create(class, props)
 	local inst = Instance.new(class)
-	if props then
-		for k, v in pairs(props) do
-			pcall(function() inst[k] = v end)
-		end
+	for k, v in pairs(props or {}) do
+		pcall(function() inst[k] = v end)
 	end
 	return inst
 end
 
-local function safePropertyExists(obj, propName)
-	local ok, _ = pcall(function() local _ = obj[propName] end)
+local function tween(obj, t, props, style, dir)
+	TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props):Play()
+end
+
+local function safe(obj, prop)
+	local ok = pcall(function() return obj[prop] end)
 	return ok
 end
 
-local function tween(obj, time, props, style, direction)
-	style = style or Enum.EasingStyle.Quad
-	direction = direction or Enum.EasingDirection.Out
-	local ok, t = pcall(function()
-		return TweenService:Create(obj, TweenInfo.new(time, style, direction), props)
-	end)
-	if ok and t then t:Play() end
-end
+----------------------------------------------------------------
+-- CLASSE DO HUB
+----------------------------------------------------------------
+local SawMillHub = {}
+SawMillHub.__index = SawMillHub
 
--- ======== DRAG & RESIZE ========
-
-local function enableDragging(topBar, mainFrame, dragSpeed)
-	if not topBar or not mainFrame then return end
-
-	local resizeHandle = create("Frame", {
-		Parent = mainFrame,
-		Size = UDim2.new(0, 16, 0, 16),
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -3, 1, -3),
-		BackgroundColor3 = Color3.fromRGB(80, 80, 80),
-		BackgroundTransparency = 0.4,
-		Name = "ResizeHandle",
-		ZIndex = 20
-	})
-	create("UICorner", { Parent = resizeHandle, CornerRadius = UDim.new(0, 4) })
-	create("UIStroke", { Parent = resizeHandle, Color = Color3.fromRGB(130, 130, 130), Thickness = 1.2 })
-
-	local resizing = false
-	local startSize, startInputPos
-
-	resizeHandle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			resizing = true
-			startSize = mainFrame.Size
-			startInputPos = input.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then resizing = false end
-			end)
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local delta = input.Position - startInputPos
-			local maxW = workspace.CurrentCamera.ViewportSize.X - 50
-			local maxH = workspace.CurrentCamera.ViewportSize.Y - 50
-			local newWidth = math.max(math.min(startSize.X.Offset + delta.X, maxW), 300)
-			local newHeight = math.max(math.min(startSize.Y.Offset + delta.Y, maxH), 200)
-			mainFrame.Size = UDim2.new(startSize.X.Scale, newWidth, startSize.Y.Scale, newHeight)
-		end
-	end)
-
-	local dragging = false
-	local dragStart, startPos
-	local speed = dragSpeed == "Slow" and 0.2 or 1
-
-	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then dragging = false end
-			end)
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local delta = input.Position - dragStart
-			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-			if speed < 1 then
-				tween(mainFrame, speed, { Position = newPos })
-			else
-				mainFrame.Position = newPos
-			end
-		end
-	end)
-end
-
--- ======== FECHAR HUB ========
-
+----------------------------------------------------------------
+-- CLOSE ANIMADO
+----------------------------------------------------------------
 function SawMillHub:Close()
-	if not self.Gui or not self.Main or self._IsClosing then return end
-	self._IsClosing = true
+	if self._Closing or not self.Gui then return end
+	self._Closing = true
 
+	-- Dispara evento OnClose
 	pcall(function() self.OnClose:Fire() end)
 
-	tween(self.Main, 0.28, {
-		Size = UDim2.new(
-			self.Main.Size.X.Scale, math.max(2, math.floor(self.Main.Size.X.Offset * 0.9)),
-			self.Main.Size.Y.Scale, math.max(2, math.floor(self.Main.Size.Y.Offset * 0.9))
-		),
+	local main = self.Main
+
+	-- Animação suave de saída
+	tween(main, 0.25, {
+		Size = UDim2.new(0, math.max(2, main.Size.X.Offset * 0.9), 0, math.max(2, main.Size.Y.Offset * 0.9)),
 		BackgroundTransparency = 1
 	})
 
-	for _, child in ipairs(self.Main:GetDescendants()) do
-		if child:IsA("GuiObject") then
+	for _, d in ipairs(main:GetDescendants()) do
+		if d:IsA("GuiObject") then
 			local props = {}
-			if safePropertyExists(child, "BackgroundTransparency") then props.BackgroundTransparency = 1 end
-			if child:IsA("TextLabel") and safePropertyExists(child, "TextTransparency") then
-				props.TextTransparency = 1
-			end
-			if child:IsA("ImageLabel") and safePropertyExists(child, "ImageTransparency") then
-				props.ImageTransparency = 1
-			end
-			if child:IsA("UIStroke") and safePropertyExists(child, "Transparency") then
-				props.Transparency = 1
-			end
-			if next(props) then tween(child, 0.22, props) end
+			if safe(d, "BackgroundTransparency") then props.BackgroundTransparency = 1 end
+			if safe(d, "TextTransparency") then props.TextTransparency = 1 end
+			if safe(d, "ImageTransparency") then props.ImageTransparency = 1 end
+			if d:IsA("UIStroke") and safe(d, "Transparency") then props.Transparency = 1 end
+			if next(props) then tween(d, 0.2, props) end
 		end
 	end
 
-	task.delay(0.34, function()
-		if self.Gui then
-			self.Gui:Destroy()
-		end
-		self._IsClosing = false
+	task.delay(0.32, function()
+		if self.Gui then self.Gui:Destroy() end
+		self._Closing = false
 	end)
 end
 
--- ======== MINIMIZAR / RESTAURAR ========
-
+----------------------------------------------------------------
+-- MINIMIZAR
+----------------------------------------------------------------
 function SawMillHub:ToggleMinimize()
 	if not self.Main then return end
 
+	self._Minimized = not self._Minimized
 	local main = self.Main
-	local btn = self.MinimizeButton
-	local mainSize = self._OriginalSize or UDim2.new(0, 450, 0, 300)
 
 	if self._Minimized then
-		tween(main, 0.35, { Size = mainSize }, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
-		if btn then
-			btn.Text = "–"
-			btn.BackgroundColor3 = Color3.fromRGB(255, 190, 60)
-		end
-		self._Minimized = false
+		self._OriginalSize = main.Size
+		tween(main, 0.35, { Size = UDim2.new(self._OriginalSize.X.Scale, self._OriginalSize.X.Offset, 0, 42) },
+			Enum.EasingStyle.Elastic)
 	else
-		if not self._OriginalSize then self._OriginalSize = main.Size end
-		local newSize = UDim2.new(self._OriginalSize.X.Scale, self._OriginalSize.X.Offset, 0, 42)
-		tween(main, 0.35, { Size = newSize }, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
-		if btn then
-			btn.Text = "+"
-			btn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-		end
-		self._Minimized = true
+		tween(main, 0.35, { Size = self._OriginalSize },
+			Enum.EasingStyle.Elastic)
 	end
 end
 
--- ======== CONSTRUTOR COMPLETO ========
+----------------------------------------------------------------
+-- DRAGGING + RESIZE SUPER OTIMIZADO
+----------------------------------------------------------------
+local function enableDrag(top, frame)
+	local dragging = false
+	local dragStart, startPos
 
-function SawMillHub.new(title, dragSpeed)
-	dragSpeed = dragSpeed or "Default"
+	top.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = i.Position
+			startPos = frame.Position
+			i.Changed:Connect(function()
+				if i.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(i)
+		if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = i.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+----------------------------------------------------------------
+-- NOVO CONSTRUTOR
+----------------------------------------------------------------
+function SawMillHub.new(title)
 	local self = setmetatable({}, SawMillHub)
 
 	self.OnClose = Instance.new("BindableEvent")
-	self.Gui = create("ScreenGui", { Name = "SawMillHub", ResetOnSpawn = false, Parent = PlayerGui })
-	create("ObjectValue", { Parent = self.Gui, Name = "SawMillHubObject", Value = self, Archivable = false })
 
+	-- GUI
+	self.Gui = create("ScreenGui", { Name = "SawMillHub", Parent = PlayerGui, ResetOnSpawn = false })
+	create("ObjectValue", { Name = "SawMillHubObject", Value = self, Parent = self.Gui })
+
+	-- MAIN
 	local mainSize = UDim2.new(0, 450, 0, 300)
-	local mainPos = UDim2.new(0.5, -mainSize.X.Offset / 2, 0.5, -mainSize.Y.Offset / 2)
 	self.Main = create("Frame", {
 		Parent = self.Gui,
 		Size = UDim2.new(0, 0, 0, 0),
-		Position = mainPos,
 		BackgroundColor3 = Color3.fromRGB(28, 28, 28),
 		ClipsDescendants = true,
-		Name = "Main"
+		Position = UDim2.new(0.5, -225, 0.5, -150),
 	})
 	create("UICorner", { Parent = self.Main, CornerRadius = UDim.new(0, 12) })
-	local mainStroke = create("UIStroke", { Parent = self.Main, Color = Color3.fromRGB(90, 90, 90), Thickness = 1.6 })
+	local border = create("UIStroke", { Parent = self.Main, Thickness = 1.5, Color = Color3.fromRGB(90, 90, 90) })
 
-	self._OriginalSize = mainSize
-	self._Minimized = false
-
-	local topBar = create("Frame", {
+	-- TopBar
+	local top = create("Frame", {
 		Parent = self.Main,
 		Size = UDim2.new(1, 0, 0, 42),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		Name = "TopBar"
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 	})
-	create("UICorner", { Parent = topBar, CornerRadius = UDim.new(0, 12) })
+	create("UICorner", { Parent = top, CornerRadius = UDim.new(0, 12) })
 
-	local titleLabel = create("TextLabel", {
-		Parent = topBar,
+	create("TextLabel", {
+		Parent = top,
 		Text = title or "SawMillHub",
 		Size = UDim2.new(1, -110, 1, 0),
 		Position = UDim2.new(0, 12, 0, 0),
-		TextColor3 = Color3.fromRGB(245, 245, 245),
-		BackgroundTransparency = 1,
-		TextXAlignment = Enum.TextXAlignment.Left,
 		Font = Enum.Font.GothamBold,
 		TextSize = 18,
-		Name = "TitleLabel"
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
-	self.Sidebar = create("Frame", {
-		Parent = self.Main,
-		Size = UDim2.new(0, 140, 1, -42),
-		Position = UDim2.new(0, 0, 0, 42),
-		BackgroundColor3 = Color3.fromRGB(22, 22, 22),
-		Name = "Sidebar"
-	})
-	create("UICorner", { Parent = self.Sidebar, CornerRadius = UDim.new(0, 8) })
-
-	self.TabHolder = create("Frame", {
-		Parent = self.Main,
-		Size = UDim2.new(1, -140, 1, -42),
-		Position = UDim2.new(0, 140, 0, 42),
-		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
-		Name = "TabHolder"
-	})
-	create("UICorner", { Parent = self.TabHolder, CornerRadius = UDim.new(0, 8) })
-
-	self.Tabs, self.Keybinds, self.Notifs = {}, {}, {}
-	self.MaxNotifs = 5
-
-	local function animateButton(btn, baseColor, hoverColor)
-		btn.MouseEnter:Connect(function()
-			tween(btn, 0.15, { BackgroundColor3 = hoverColor, Size = UDim2.new(0, 36, 0, 36) })
-		end)
-		btn.MouseLeave:Connect(function()
-			tween(btn, 0.15, { BackgroundColor3 = baseColor, Size = UDim2.new(0, 32, 0, 32) })
-		end)
-		btn.MouseButton1Down:Connect(function()
-			tween(btn, 0.1, { Size = UDim2.new(0, 28, 0, 28) })
-		end)
-		btn.MouseButton1Up:Connect(function()
-			tween(btn, 0.1, { Size = UDim2.new(0, 32, 0, 32) })
-		end)
-	end
-
-	-- MINIMIZE BUTTON
-	local minimizeButton = create("TextButton", {
-		Parent = topBar,
-		Text = "–",
+	-- Close Button
+	local close = create("TextButton", {
+		Parent = top,
 		Size = UDim2.new(0, 32, 0, 32),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -44, 0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(255, 190, 60),
-		TextColor3 = Color3.fromRGB(10, 10, 10),
+		Position = UDim2.new(1, -40, 0.5, -16),
+		BackgroundColor3 = Color3.fromRGB(235, 75, 75),
+		Text = "X",
+		Font = Enum.Font.GothamBold,
+		TextSize = 20,
+		TextColor3 = Color3.new(1, 1, 1)
+	})
+	create("UICorner", { Parent = close, CornerRadius = UDim.new(0, 8) })
+	close.MouseButton1Click:Connect(function() self:Close() end)
+
+	-- Minimize Button
+	local mini = create("TextButton", {
+		Parent = top,
+		Size = UDim2.new(0, 32, 0, 32),
+		Position = UDim2.new(1, -80, 0.5, -16),
+		BackgroundColor3 = Color3.fromRGB(255, 200, 50),
+		Text = "–",
 		Font = Enum.Font.GothamBold,
 		TextSize = 24,
-		AutoButtonColor = false,
-		Name = "MinimizeButton"
+		TextColor3 = Color3.fromRGB(10, 10, 10)
 	})
-	create("UICorner", { Parent = minimizeButton, CornerRadius = UDim.new(0, 8) })
-	minimizeButton.MouseButton1Click:Connect(function()
-		self:ToggleMinimize()
-	end)
-	animateButton(minimizeButton, Color3.fromRGB(255, 190, 60), Color3.fromRGB(255, 220, 80))
-	self.MinimizeButton = minimizeButton
+	create("UICorner", { Parent = mini, CornerRadius = UDim.new(0, 8) })
+	mini.MouseButton1Click:Connect(function() self:ToggleMinimize() end)
 
-	-- CLOSE BUTTON
-	local closeButton = create("TextButton", {
-		Parent = topBar,
-		Text = "X",
-		Size = UDim2.new(0, 32, 0, 32),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -6, 0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(235, 75, 75),
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 20,
-		AutoButtonColor = false,
-		Name = "CloseButton"
-	})
-	create("UICorner", { Parent = closeButton, CornerRadius = UDim.new(0, 8) })
-	closeButton.MouseButton1Click:Connect(function() self:Close() end)
-	animateButton(closeButton, Color3.fromRGB(235, 75, 75), Color3.fromRGB(255, 95, 95))
+	-- Dragging
+	enableDrag(top, self.Main)
 
-	-- RESET BUTTON
-	local resetButton = create("TextButton", {
-		Parent = topBar,
-		Size = UDim2.new(0, 32, 0, 32),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -82, 0.5, 0),
-		BackgroundColor3 = Color3.fromRGB(90, 170, 255),
-		Text = "R",
-		TextColor3 = Color3.fromRGB(10, 10, 10),
-		Font = Enum.Font.GothamBold,
-		TextSize = 20,
-		AutoButtonColor = false,
-		Name = "ResetButton"
-	})
-	create("UICorner", { Parent = resetButton, CornerRadius = UDim.new(0, 8) })
-	resetButton.MouseButton1Click:Connect(function()
-		local pulseSize = UDim2.new(mainSize.X.Scale, mainSize.X.Offset * 1.15, mainSize.Y.Scale, mainSize.Y.Offset * 1.15)
-		tween(self.Main, 0.25, { Size = pulseSize }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		task.delay(0.25, function()
-			tween(self.Main, 0.25, { Size = mainSize }, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
-		end)
-		self._OriginalSize = mainSize
-	end)
-	animateButton(resetButton, Color3.fromRGB(90, 170, 255), Color3.fromRGB(120, 200, 255))
-
-	-- ENABLE DRAGGING
-	enableDragging(topBar, self.Main, dragSpeed)
-
-	-- RAINBOW BORDER
+	-- Rainbow border
 	local hue = 0
 	RunService.RenderStepped:Connect(function(dt)
 		hue = (hue + dt * 0.08) % 1
-		if mainStroke then mainStroke.Color = Color3.fromHSV(hue, 0.9, 1) end
-		if titleLabel then titleLabel.TextColor3 = Color3.fromHSV(hue, 1, 1) end
+		border.Color = Color3.fromHSV(hue, 1, 1)
 	end)
 
-	-- OPEN ANIMATION
-	tween(self.Main, 0.4, { Size = mainSize }, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
+	-- Abertura animada
+	tween(self.Main, 0.4, { Size = mainSize }, Enum.EasingStyle.Elastic)
 
 	return self
 end
