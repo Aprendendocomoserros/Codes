@@ -4,10 +4,29 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--------------------------------------------------------------------
+-- 🔥 SISTEMA PARA REMOVER HUB ANTIGO SE OUTRO FOR CRIADO
+--------------------------------------------------------------------
+do
+    local old = PlayerGui:FindFirstChild("SawMillHub")
+
+    if old then
+        local objVal = old:FindFirstChild("SawMillHubObject")
+
+        if objVal and objVal.Value and objVal.Value.OnClose then
+            pcall(function()
+                objVal.Value.OnClose:Fire()
+            end)
+        end
+
+        old:Destroy()
+    end
+end
+--------------------------------------------------------------------
 
 local SawMillHub = {}
 SawMillHub.__index = SawMillHub
@@ -60,7 +79,7 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	local startSize, startInputPos
 
 	resizeHandle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			resizing = true
 			startSize = mainFrame.Size
 			startInputPos = input.Position
@@ -71,7 +90,7 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - startInputPos
 			local maxW = workspace.CurrentCamera.ViewportSize.X - 50
 			local maxH = workspace.CurrentCamera.ViewportSize.Y - 50
@@ -81,28 +100,12 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 		end
 	end)
 
-	resizeHandle.MouseEnter:Connect(function()
-		TweenService:Create(resizeHandle, TweenInfo.new(0.15), {
-			BackgroundTransparency = 0.2,
-			BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-		}):Play()
-	end)
-
-	resizeHandle.MouseLeave:Connect(function()
-		if not resizing then
-			TweenService:Create(resizeHandle, TweenInfo.new(0.15), {
-				BackgroundTransparency = 0.4,
-				BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-			}):Play()
-		end
-	end)
-
 	local dragging = false
 	local dragStart, startPos
 	local speed = dragSpeed == "Slow" and 0.2 or 1
 
 	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = input.Position
 			startPos = mainFrame.Position
@@ -113,7 +116,7 @@ local function enableDragging(topBar, mainFrame, dragSpeed)
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
 			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			if speed < 1 then
@@ -130,6 +133,7 @@ end
 function SawMillHub:Close()
 	if not self.Gui or not self.Main or self._IsClosing then return end
 	self._IsClosing = true
+
 	pcall(function() self.OnClose:Fire() end)
 
 	tween(self.Main, 0.28, {
@@ -144,10 +148,10 @@ function SawMillHub:Close()
 		if child:IsA("GuiObject") then
 			local props = {}
 			if safePropertyExists(child, "BackgroundTransparency") then props.BackgroundTransparency = 1 end
-			if (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox")) and safePropertyExists(child, "TextTransparency") then
+			if child:IsA("TextLabel") and safePropertyExists(child, "TextTransparency") then
 				props.TextTransparency = 1
 			end
-			if (child:IsA("ImageLabel") or child:IsA("ImageButton")) and safePropertyExists(child, "ImageTransparency") then
+			if child:IsA("ImageLabel") and safePropertyExists(child, "ImageTransparency") then
 				props.ImageTransparency = 1
 			end
 			if child:IsA("UIStroke") and safePropertyExists(child, "Transparency") then
@@ -158,7 +162,9 @@ function SawMillHub:Close()
 	end
 
 	task.delay(0.34, function()
-		if self.Gui and self.Gui.Parent then pcall(function() self.Gui:Destroy() end) end
+		if self.Gui then
+			self.Gui:Destroy()
+		end
 		self._IsClosing = false
 	end)
 end
@@ -349,7 +355,7 @@ function SawMillHub.new(title, dragSpeed)
 		if titleLabel then titleLabel.TextColor3 = Color3.fromHSV(hue, 1, 1) end
 	end)
 
-	-- ANIMAÇÃO DE ABERTURA
+	-- OPEN ANIMATION
 	tween(self.Main, 0.4, { Size = mainSize }, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
 
 	return self
