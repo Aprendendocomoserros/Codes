@@ -1322,3 +1322,4 @@ function Hub.novo(nome, tema, velocidade)
 	self.EhMobile = IS_MOBILE
 	return self
 end
+Hub.new = Hub.novo
