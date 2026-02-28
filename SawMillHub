@@ -1323,3 +1323,4 @@ function Hub.novo(nome, tema, velocidade)
 	return self
 end
 Hub.new = Hub.novo
+return Hub
