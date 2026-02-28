@@ -1,5 +1,6 @@
 -- ╔══════════════════════════════════════════════════════════╗
--- ║               HUB UI — MÓDULO v6.2                      ║
+-- ║               HUB UI — MÓDULO v6.3                      ║
+-- ║  + ColorPicker HSV corrigido (PC e Mobile)              ║
 -- ║  + CriarDropdown com :AtualizarOpcoes()                 ║
 -- ╚══════════════════════════════════════════════════════════╝
 
@@ -535,178 +536,327 @@ function Hub.novo(nome, tema, velocidade)
 		local function PO() ord+=1; return ord end
 		local function RC(obj,prop,key) RegCor(obj,prop,key) end
 
+		-- ╔══════════════════════════════════════════════════════════╗
+		-- ║  CriarColorPicker — HSV corrigido (v6.3)                ║
+		-- ║  • AtualizarTudo() declarada ANTES de qualquer uso      ║
+		-- ║  • Slider unificado para PC e Mobile                    ║
+		-- ║  • callback chamado apenas 1× por interação             ║
+		-- ╚══════════════════════════════════════════════════════════╝
 		function Aba:CriarColorPicker(texto, padraoColor3, callback)
-			local corAtual=padraoColor3 or Color3.fromRGB(255,255,255)
-			local h,s,v=Color3.toHSV(corAtual)
-			local aberto=false
-			local FH=IS_MOBILE and 44 or 40
-			local PICKER_H=IS_MOBILE and 240 or 175
-			local AH=FH+PICKER_H+8
-			local fr=F({Size=UDim2.new(1,-6,0,FH),BackgroundColor3=C.Cartao,ClipsDescendants=true,LayoutOrder=PO(),Parent=pagina})
+			local corAtual = padraoColor3 or Color3.fromRGB(255,255,255)
+			local h, s, v  = Color3.toHSV(corAtual)
+			local aberto   = false
+			local FH       = IS_MOBILE and 44 or 40
+			local PICKER_H = IS_MOBILE and 240 or 175
+			local AH       = FH + PICKER_H + 8
+
+			local fr = F({Size=UDim2.new(1,-6,0,FH), BackgroundColor3=C.Cartao,
+				ClipsDescendants=true, LayoutOrder=PO(), Parent=pagina})
 			Cantos(fr,10); Stroke(fr,C.Borda,1,0.35); RC(fr,"BackgroundColor3","Cartao")
-			local cab=Instance.new("TextButton")
-			cab.Size=UDim2.new(1,0,0,FH); cab.BackgroundTransparency=1; cab.Text=""; cab.AutoButtonColor=false; cab.Parent=fr
-			L({Size=UDim2.new(0.5,0,1,0),Position=UDim2.new(0,14,0,0),Text=texto,TextColor3=C.Sub,Font=Enum.Font.Gotham,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,Parent=cab})
-			local preview=F({Size=UDim2.new(0,22,0,22),Position=UDim2.new(1,-52,0.5,-11),BackgroundColor3=corAtual,ZIndex=2,Parent=cab})
+
+			local cab = Instance.new("TextButton")
+			cab.Size=UDim2.new(1,0,0,FH); cab.BackgroundTransparency=1
+			cab.Text=""; cab.AutoButtonColor=false; cab.Parent=fr
+
+			L({Size=UDim2.new(0.5,0,1,0), Position=UDim2.new(0,14,0,0), Text=texto,
+				TextColor3=C.Sub, Font=Enum.Font.Gotham, TextSize=12,
+				TextXAlignment=Enum.TextXAlignment.Left, Parent=cab})
+
+			local preview = F({Size=UDim2.new(0,22,0,22), Position=UDim2.new(1,-52,0.5,-11),
+				BackgroundColor3=corAtual, ZIndex=2, Parent=cab})
 			Cantos(preview,6); Stroke(preview,C.Borda,1,0.2)
-			local seta=L({Size=UDim2.new(0,20,1,0),Position=UDim2.new(1,-26,0,0),Text="›",TextColor3=C.Fraco,Font=Enum.Font.GothamBold,TextSize=16,Rotation=90,Parent=cab})
+
+			local seta = L({Size=UDim2.new(0,20,1,0), Position=UDim2.new(1,-26,0,0),
+				Text="›", TextColor3=C.Fraco, Font=Enum.Font.GothamBold,
+				TextSize=16, Rotation=90, Parent=cab})
 			RC(seta,"TextColor3","Fraco")
-			local corpo2=F({Size=UDim2.new(1,0,0,PICKER_H),Position=UDim2.new(0,0,0,FH),BackgroundTransparency=1,Parent=fr})
-			local cores={
-				Color3.fromRGB(255,59,59),Color3.fromRGB(220,38,38),Color3.fromRGB(185,28,28),
-				Color3.fromRGB(255,100,130),Color3.fromRGB(236,72,153),Color3.fromRGB(190,24,93),
-				Color3.fromRGB(255,140,0),Color3.fromRGB(234,88,12),Color3.fromRGB(194,65,12),
-				Color3.fromRGB(255,210,0),Color3.fromRGB(234,179,8),Color3.fromRGB(161,98,7),
-				Color3.fromRGB(74,222,128),Color3.fromRGB(34,197,94),Color3.fromRGB(22,163,74),
-				Color3.fromRGB(163,230,53),Color3.fromRGB(132,204,22),Color3.fromRGB(77,124,15),
-				Color3.fromRGB(56,189,248),Color3.fromRGB(14,165,233),Color3.fromRGB(2,132,199),
-				Color3.fromRGB(34,211,238),Color3.fromRGB(6,182,212),Color3.fromRGB(8,145,178),
-				Color3.fromRGB(167,139,250),Color3.fromRGB(139,92,246),Color3.fromRGB(109,40,217),
-				Color3.fromRGB(232,121,249),Color3.fromRGB(192,38,211),Color3.fromRGB(134,25,143),
-				Color3.fromRGB(255,255,255),Color3.fromRGB(200,200,210),Color3.fromRGB(148,148,165),
-				Color3.fromRGB(80,80,100),Color3.fromRGB(30,30,45),Color3.fromRGB(0,0,0),
-			}
-			if IS_MOBILE then
-				local COLS=12; local CELL=28; local GAP=5; local gridVisW=170; local gridX=130
-				local gridScroll=Instance.new("ScrollingFrame")
-				gridScroll.Size=UDim2.new(0,gridVisW,0,150); gridScroll.Position=UDim2.new(0,gridX,0,10)
-				gridScroll.ScrollBarThickness=3; gridScroll.ScrollBarImageColor3=C.Destaque
-				gridScroll.BackgroundTransparency=1; gridScroll.BorderSizePixel=0
-				gridScroll.ScrollingDirection=Enum.ScrollingDirection.XY; gridScroll.ZIndex=2; gridScroll.Parent=corpo2
-				local totalRows=math.ceil(#cores/COLS)
-				gridScroll.CanvasSize=UDim2.new(0,COLS*(CELL+GAP)-GAP+4,0,totalRows*(CELL+GAP)-GAP+4)
-				for i,cor in ipairs(cores) do
-					local col=(i-1)%COLS; local row=math.floor((i-1)/COLS)
-					local btn=Instance.new("TextButton")
-					btn.Size=UDim2.new(0,CELL,0,CELL); btn.Position=UDim2.new(0,col*(CELL+GAP),0,row*(CELL+GAP))
-					btn.BackgroundColor3=cor; btn.Text=""; btn.AutoButtonColor=false; btn.ZIndex=3; btn.Parent=gridScroll
-					Cantos(btn,5)
-					local brdCell=Stroke(btn,Color3.new(0,0,0),1,0.75)
-					btn.MouseEnter:Connect(function() Tw(btn,0.1,{Size=UDim2.new(0,CELL+4,0,CELL+4),Position=UDim2.new(0,col*(CELL+GAP)-2,0,row*(CELL+GAP)-2)}):Play(); Tw(brdCell,0.1,{Transparency=0.2}):Play() end)
-					btn.MouseLeave:Connect(function() Tw(btn,0.1,{Size=UDim2.new(0,CELL,0,CELL),Position=UDim2.new(0,col*(CELL+GAP),0,row*(CELL+GAP))}):Play(); Tw(brdCell,0.1,{Transparency=0.75}):Play() end)
-					btn.MouseButton1Click:Connect(function() corAtual=cor; h,s,v=Color3.toHSV(cor); preview.BackgroundColor3=cor; AtualizarHSV(); if callback then callback(corAtual) end end)
-				end
-				local sliderW=100; local sliderX=14; local lblSize=10
-				local function CriarSliderHSV(label,yPos,valor)
-					local lbl=L({Size=UDim2.new(0,sliderW,0,14),Position=UDim2.new(0,sliderX,0,yPos),Text=label,TextColor3=C.Sub,Font=Enum.Font.GothamBold,TextSize=lblSize,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=2,Parent=corpo2})
-					RC(lbl,"TextColor3","Sub")
-					local trilha=F({Size=UDim2.new(0,sliderW,0,6),Position=UDim2.new(0,sliderX,0,yPos+16),BackgroundColor3=C.Item,ZIndex=2,Parent=corpo2})
-					Cantos(trilha,99); RC(trilha,"BackgroundColor3","Item")
-					local grad=Instance.new("UIGradient"); grad.Rotation=0; grad.Parent=trilha
-					local BOLA2=16
-					local bola2=F({Size=UDim2.new(0,BOLA2,0,BOLA2),Position=UDim2.new(valor,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),BackgroundColor3=Color3.new(1,1,1),ZIndex=4,Parent=trilha})
-					Cantos(bola2,99); Stroke(bola2,Color3.new(0,0,0),1,0.7)
-					local hitbox2=F({Size=UDim2.new(1,0,0,36),Position=UDim2.new(0,0,0.5,-18),BackgroundTransparency=1,ZIndex=5,Parent=trilha})
-					local ativo2=false
-					table.insert(hubSelf._conexoes,EntradaUsuario.InputEnded:Connect(function(i)
-						if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-							if ativo2 then ativo2=false; Tw(bola2,0.08,{Size=UDim2.new(0,BOLA2,0,BOLA2)}):Play() end
-						end
-					end))
-					return {trilha=trilha,bola=bola2,grad=grad,hitbox=hitbox2,ativo=function() return ativo2 end,setAtivo=function(v2) ativo2=v2 end,setPos=function(p) bola2.Position=UDim2.new(math.clamp(p,0,1),0,0.5,0) end,getPos=function() return bola2.Position.X.Scale end}
-				end
-				local slH=CriarSliderHSV("H",8,h); local slS=CriarSliderHSV("S",42,s); local slV=CriarSliderHSV("V",76,v)
-				local lblHex=L({Size=UDim2.new(0,sliderW,0,16),Position=UDim2.new(0,sliderX,0,110),Text="#FFFFFF",TextColor3=C.Sub,Font=Enum.Font.GothamBold,TextSize=lblSize,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=2,Parent=corpo2})
-				RC(lblHex,"TextColor3","Sub")
-				local bigPreview=F({Size=UDim2.new(0,sliderW,0,60),Position=UDim2.new(0,sliderX,0,130),BackgroundColor3=corAtual,ZIndex=2,Parent=corpo2})
-				Cantos(bigPreview,8); Stroke(bigPreview,C.Borda,1,0.3)
-				local function CorParaHex(c) return string.format("#%02X%02X%02X",math.floor(c.R*255),math.floor(c.G*255),math.floor(c.B*255)) end
-				local function HueGrad() local kfs={} for i=0,6 do table.insert(kfs,ColorSequenceKeypoint.new(i/6,Color3.fromHSV(i/6,1,1))) end return ColorSequence.new(kfs) end
-				function AtualizarHSV()
-					slH.setPos(h); slS.setPos(s); slV.setPos(v)
-					slH.grad.Color=HueGrad(); slS.grad.Color=ColorSequence.new(Color3.fromHSV(h,0,v),Color3.fromHSV(h,1,v)); slV.grad.Color=ColorSequence.new(Color3.fromHSV(h,s,0),Color3.fromHSV(h,s,1))
-					corAtual=Color3.fromHSV(h,s,v); preview.BackgroundColor3=corAtual; bigPreview.BackgroundColor3=corAtual; lblHex.Text=CorParaHex(corAtual)
-				end
-				local function ConectarSlider(sl,fn)
-					sl.hitbox.InputBegan:Connect(function(i)
-						if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-							sl.setAtivo(true); local p=math.clamp((i.Position.X-sl.trilha.AbsolutePosition.X)/sl.trilha.AbsoluteSize.X,0,1); sl.setPos(p); fn(p); AtualizarHSV(); Tw(sl.bola,0.08,{Size=UDim2.new(0,19,0,19)}):Play(); if callback then callback(corAtual) end
-						end
-					end)
-					table.insert(hubSelf._conexoes,EntradaUsuario.InputChanged:Connect(function(i)
-						if not sl.ativo() then return end
-						if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
-							local p=math.clamp((i.Position.X-sl.trilha.AbsolutePosition.X)/sl.trilha.AbsoluteSize.X,0,1); sl.setPos(p); fn(p); AtualizarHSV(); if callback then callback(corAtual) end
-						end
-					end))
-				end
-				ConectarSlider(slH,function(p) h=p end); ConectarSlider(slS,function(p) s=p end); ConectarSlider(slV,function(p) v=p end)
-				AtualizarHSV()
-			else
-				local CELL=22; local GAP=4; local COLS=6
-				local totalRows=math.ceil(#cores/COLS); local gridW=COLS*(CELL+GAP)-GAP; local gridH=totalRows*(CELL+GAP)-GAP
-				local precisaScroll=gridH>(PICKER_H-16); local gridContainer
-				if precisaScroll then
-					local gs=Instance.new("ScrollingFrame")
-					gs.Size=UDim2.new(0,gridW+6,0,PICKER_H-16); gs.Position=UDim2.new(0,10,0,8)
-					gs.CanvasSize=UDim2.new(0,0,0,gridH+4); gs.ScrollBarThickness=2; gs.ScrollBarImageColor3=C.Destaque
-					gs.BackgroundTransparency=1; gs.BorderSizePixel=0; gs.ScrollingDirection=Enum.ScrollingDirection.Y; gs.ZIndex=2; gs.Parent=corpo2
-					gridContainer=gs
-				else
-					local gf=F({Size=UDim2.new(0,gridW,0,gridH),Position=UDim2.new(0,10,0,(PICKER_H-gridH)/2),BackgroundTransparency=1,ZIndex=2,Parent=corpo2})
-					gridContainer=gf
-				end
-				for i,cor in ipairs(cores) do
-					local col=(i-1)%COLS; local row=math.floor((i-1)/COLS)
-					local btn=Instance.new("TextButton")
-					btn.Size=UDim2.new(0,CELL,0,CELL); btn.Position=UDim2.new(0,col*(CELL+GAP),0,row*(CELL+GAP))
-					btn.BackgroundColor3=cor; btn.Text=""; btn.AutoButtonColor=false; btn.ZIndex=3; btn.Parent=gridContainer
-					Cantos(btn,5)
-					local brdCell=Stroke(btn,Color3.new(0,0,0),1,0.75)
-					btn.MouseEnter:Connect(function() Tw(btn,0.1,{Size=UDim2.new(0,CELL+3,0,CELL+3),Position=UDim2.new(0,col*(CELL+GAP)-1,0,row*(CELL+GAP)-1)}):Play(); Tw(brdCell,0.1,{Transparency=0.15}):Play() end)
-					btn.MouseLeave:Connect(function() Tw(btn,0.1,{Size=UDim2.new(0,CELL,0,CELL),Position=UDim2.new(0,col*(CELL+GAP),0,row*(CELL+GAP))}):Play(); Tw(brdCell,0.1,{Transparency=0.75}):Play() end)
-					btn.MouseButton1Click:Connect(function() corAtual=cor; h,s,v=Color3.toHSV(cor); preview.BackgroundColor3=cor; AtualizarHSVpc(); if callback then callback(corAtual) end end)
-				end
-				local rightX=gridW+22; local rightW=115
-				local bigPreview=F({Size=UDim2.new(0,rightW,0,40),Position=UDim2.new(0,rightX,0,8),BackgroundColor3=corAtual,ZIndex=2,Parent=corpo2})
-				Cantos(bigPreview,8); Stroke(bigPreview,C.Borda,1,0.25)
-				local lblHex=L({Size=UDim2.new(0,rightW,0,14),Position=UDim2.new(0,rightX,0,52),Text="#FFFFFF",TextColor3=C.Sub,Font=Enum.Font.GothamBold,TextSize=10,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=2,Parent=corpo2})
-				RC(lblHex,"TextColor3","Sub")
-				local function CorParaHex(c) return string.format("#%02X%02X%02X",math.floor(c.R*255),math.floor(c.G*255),math.floor(c.B*255)) end
-				local function CriarSliderHSVpc(label,yPos,valor)
-					L({Size=UDim2.new(0,rightW,0,12),Position=UDim2.new(0,rightX,0,yPos),Text=label,TextColor3=C.Sub,Font=Enum.Font.GothamBold,TextSize=9,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=2,Parent=corpo2})
-					local trilha=F({Size=UDim2.new(0,rightW,0,5),Position=UDim2.new(0,rightX,0,yPos+13),BackgroundColor3=C.Item,ZIndex=2,Parent=corpo2})
-					Cantos(trilha,99); RC(trilha,"BackgroundColor3","Item")
-					local grad=Instance.new("UIGradient"); grad.Rotation=0; grad.Parent=trilha
-					local BOLA2=13
-					local bola2=F({Size=UDim2.new(0,BOLA2,0,BOLA2),Position=UDim2.new(valor,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),BackgroundColor3=Color3.new(1,1,1),ZIndex=4,Parent=trilha})
-					Cantos(bola2,99); Stroke(bola2,Color3.new(0,0,0),1,0.7)
-					local hitbox2=F({Size=UDim2.new(1,0,0,28),Position=UDim2.new(0,0,0.5,-14),BackgroundTransparency=1,ZIndex=5,Parent=trilha})
-					local ativo2=false
-					table.insert(hubSelf._conexoes,EntradaUsuario.InputEnded:Connect(function(i)
-						if i.UserInputType==Enum.UserInputType.MouseButton1 then if ativo2 then ativo2=false; Tw(bola2,0.08,{Size=UDim2.new(0,BOLA2,0,BOLA2)}):Play() end end
-					end))
-					return {trilha=trilha,bola=bola2,grad=grad,hitbox=hitbox2,ativo=function() return ativo2 end,setAtivo=function(v2) ativo2=v2 end,setPos=function(p) bola2.Position=UDim2.new(math.clamp(p,0,1),0,0.5,0) end}
-				end
-				local slH=CriarSliderHSVpc("H",70,h); local slS=CriarSliderHSVpc("S",100,s); local slV=CriarSliderHSVpc("V",130,v)
-				local function HueGrad() local kfs={} for i=0,6 do table.insert(kfs,ColorSequenceKeypoint.new(i/6,Color3.fromHSV(i/6,1,1))) end return ColorSequence.new(kfs) end
-				function AtualizarHSVpc()
-					slH.setPos(h); slS.setPos(s); slV.setPos(v)
-					slH.grad.Color=HueGrad(); slS.grad.Color=ColorSequence.new(Color3.fromHSV(h,0,v),Color3.fromHSV(h,1,v)); slV.grad.Color=ColorSequence.new(Color3.fromHSV(h,s,0),Color3.fromHSV(h,s,1))
-					corAtual=Color3.fromHSV(h,s,v); preview.BackgroundColor3=corAtual; bigPreview.BackgroundColor3=corAtual; lblHex.Text=CorParaHex(corAtual)
-				end
-				local function ConectarSliderPC(sl,fn)
-					sl.hitbox.InputBegan:Connect(function(i)
-						if i.UserInputType==Enum.UserInputType.MouseButton1 then
-							sl.setAtivo(true); local p=math.clamp((i.Position.X-sl.trilha.AbsolutePosition.X)/sl.trilha.AbsoluteSize.X,0,1); sl.setPos(p); fn(p); AtualizarHSVpc(); Tw(sl.bola,0.08,{Size=UDim2.new(0,16,0,16)}):Play(); if callback then callback(corAtual) end
-						end
-					end)
-					table.insert(hubSelf._conexoes,EntradaUsuario.InputChanged:Connect(function(i)
-						if not sl.ativo() then return end
-						if i.UserInputType==Enum.UserInputType.MouseMovement then
-							local p=math.clamp((i.Position.X-sl.trilha.AbsolutePosition.X)/sl.trilha.AbsoluteSize.X,0,1); sl.setPos(p); fn(p); AtualizarHSVpc(); if callback then callback(corAtual) end
-						end
-					end))
-				end
-				ConectarSliderPC(slH,function(p) h=p end); ConectarSliderPC(slS,function(p) s=p end); ConectarSliderPC(slV,function(p) v=p end)
-				function AtualizarHSV() AtualizarHSVpc() end
-				AtualizarHSVpc()
+
+			local corpo2 = F({Size=UDim2.new(1,0,0,PICKER_H),
+				Position=UDim2.new(0,0,0,FH), BackgroundTransparency=1, Parent=fr})
+
+			-- referências dos widgets (preenchidas antes de AtualizarTudo ser chamada)
+			local slH_ref, slS_ref, slV_ref
+			local bigPreview_ref, lblHex_ref
+
+			local function CorParaHex(c)
+				return string.format("#%02X%02X%02X",
+					math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255))
 			end
-			cab.MouseButton1Click:Connect(function() aberto=not aberto; Tw(fr,0.2,{Size=UDim2.new(1,-6,0,aberto and AH or FH)}):Play(); Tw(seta,0.2,{Rotation=aberto and -90 or 90}):Play() end)
-			fr.MouseEnter:Connect(function() if not aberto then Tw(fr,0.12,{BackgroundColor3=C.ItemHover}):Play() end end)
-			fr.MouseLeave:Connect(function() Tw(fr,0.12,{BackgroundColor3=C.Cartao}):Play() end)
-			local obj={}
-			function obj:Definir(c) corAtual=c; h,s,v=Color3.toHSV(c); preview.BackgroundColor3=c; AtualizarHSV() end
+			local function HueGrad()
+				local kfs={}
+				for i=0,6 do
+					table.insert(kfs, ColorSequenceKeypoint.new(i/6, Color3.fromHSV(i/6,1,1)))
+				end
+				return ColorSequence.new(kfs)
+			end
+
+			-- ► função central — atualiza TUDO a partir de h,s,v
+			local function AtualizarTudo()
+				h = math.clamp(h,0,1)
+				s = math.clamp(s,0,1)
+				v = math.clamp(v,0,1)
+				corAtual = Color3.fromHSV(h,s,v)
+
+				preview.BackgroundColor3 = corAtual
+				if bigPreview_ref then bigPreview_ref.BackgroundColor3 = corAtual end
+				if lblHex_ref     then lblHex_ref.Text = CorParaHex(corAtual) end
+
+				if slH_ref then
+					slH_ref.setPos(h)
+					slH_ref.grad.Color = HueGrad()
+				end
+				if slS_ref then
+					slS_ref.setPos(s)
+					slS_ref.grad.Color = ColorSequence.new(
+						Color3.fromHSV(h,0,v), Color3.fromHSV(h,1,v))
+				end
+				if slV_ref then
+					slV_ref.setPos(v)
+					slV_ref.grad.Color = ColorSequence.new(
+						Color3.fromHSV(h,s,0), Color3.fromHSV(h,s,1))
+				end
+
+				if callback then callback(corAtual) end
+			end
+
+			-- ► construtor de slider genérico (PC e Mobile unificados)
+			local function CriarSliderHSV(label, yPos, xPos, largura, bolaSize, lblSize, hitH, prop)
+				L({Size=UDim2.new(0,largura,0,14), Position=UDim2.new(0,xPos,0,yPos),
+					Text=label, TextColor3=C.Sub, Font=Enum.Font.GothamBold,
+					TextSize=lblSize, TextXAlignment=Enum.TextXAlignment.Left,
+					ZIndex=2, Parent=corpo2})
+
+				local trilha = F({
+					Size=UDim2.new(0,largura,0,IS_MOBILE and 6 or 5),
+					Position=UDim2.new(0,xPos,0,yPos+(IS_MOBILE and 16 or 14)),
+					BackgroundColor3=C.Item, ZIndex=2, Parent=corpo2})
+				Cantos(trilha,99); RC(trilha,"BackgroundColor3","Item")
+
+				local grad = Instance.new("UIGradient")
+				grad.Rotation=0; grad.Parent=trilha
+
+				local bola = F({
+					Size=UDim2.new(0,bolaSize,0,bolaSize),
+					Position=UDim2.new(0,0,0.5,0),
+					AnchorPoint=Vector2.new(0.5,0.5),
+					BackgroundColor3=Color3.new(1,1,1), ZIndex=4, Parent=trilha})
+				Cantos(bola,99); Stroke(bola,Color3.new(0,0,0),1,0.7)
+
+				local hitbox = F({
+					Size=UDim2.new(1,0,0,hitH),
+					Position=UDim2.new(0,0,0.5,-hitH/2),
+					BackgroundTransparency=1, ZIndex=5, Parent=trilha})
+
+				local ativo = false
+
+				local function setPos(p)
+					bola.Position = UDim2.new(math.clamp(p,0,1), 0, 0.5, 0)
+				end
+				local function getP(inputX)
+					return math.clamp(
+						(inputX - trilha.AbsolutePosition.X) / trilha.AbsoluteSize.X, 0, 1)
+				end
+
+				hitbox.InputBegan:Connect(function(i)
+					if i.UserInputType==Enum.UserInputType.MouseButton1
+					or i.UserInputType==Enum.UserInputType.Touch then
+						ativo = true
+						local p = getP(i.Position.X)
+						if prop=="h" then h=p elseif prop=="s" then s=p else v=p end
+						AtualizarTudo()
+						Tw(bola,0.08,{Size=UDim2.new(0,bolaSize+4,0,bolaSize+4)}):Play()
+					end
+				end)
+				table.insert(hubSelf._conexoes, EntradaUsuario.InputChanged:Connect(function(i)
+					if not ativo then return end
+					if i.UserInputType==Enum.UserInputType.MouseMovement
+					or i.UserInputType==Enum.UserInputType.Touch then
+						local p = getP(i.Position.X)
+						if prop=="h" then h=p elseif prop=="s" then s=p else v=p end
+						AtualizarTudo()
+					end
+				end))
+				table.insert(hubSelf._conexoes, EntradaUsuario.InputEnded:Connect(function(i)
+					if i.UserInputType==Enum.UserInputType.MouseButton1
+					or i.UserInputType==Enum.UserInputType.Touch then
+						if ativo then
+							ativo=false
+							Tw(bola,0.08,{Size=UDim2.new(0,bolaSize,0,bolaSize)}):Play()
+						end
+					end
+				end))
+
+				return {trilha=trilha, bola=bola, grad=grad, setPos=setPos}
+			end
+
+			-- paleta predefinida
+			local cores = {
+				Color3.fromRGB(255,59,59),   Color3.fromRGB(220,38,38),   Color3.fromRGB(185,28,28),
+				Color3.fromRGB(255,100,130),  Color3.fromRGB(236,72,153),  Color3.fromRGB(190,24,93),
+				Color3.fromRGB(255,140,0),    Color3.fromRGB(234,88,12),   Color3.fromRGB(194,65,12),
+				Color3.fromRGB(255,210,0),    Color3.fromRGB(234,179,8),   Color3.fromRGB(161,98,7),
+				Color3.fromRGB(74,222,128),   Color3.fromRGB(34,197,94),   Color3.fromRGB(22,163,74),
+				Color3.fromRGB(163,230,53),   Color3.fromRGB(132,204,22),  Color3.fromRGB(77,124,15),
+				Color3.fromRGB(56,189,248),   Color3.fromRGB(14,165,233),  Color3.fromRGB(2,132,199),
+				Color3.fromRGB(34,211,238),   Color3.fromRGB(6,182,212),   Color3.fromRGB(8,145,178),
+				Color3.fromRGB(167,139,250),  Color3.fromRGB(139,92,246),  Color3.fromRGB(109,40,217),
+				Color3.fromRGB(232,121,249),  Color3.fromRGB(192,38,211),  Color3.fromRGB(134,25,143),
+				Color3.fromRGB(255,255,255),  Color3.fromRGB(200,200,210), Color3.fromRGB(148,148,165),
+				Color3.fromRGB(80,80,100),    Color3.fromRGB(30,30,45),    Color3.fromRGB(0,0,0),
+			}
+
+			local function CriarGrid(parent, cell, gap, cols, maxH)
+				local totalRows = math.ceil(#cores/cols)
+				local gridW = cols*(cell+gap)-gap
+				local gridH = totalRows*(cell+gap)-gap
+				local container
+
+				if maxH and gridH > maxH then
+					local gs = Instance.new("ScrollingFrame")
+					gs.Size=UDim2.new(0,gridW+6,0,maxH)
+					gs.CanvasSize=UDim2.new(0,0,0,gridH+4)
+					gs.ScrollBarThickness=2; gs.ScrollBarImageColor3=C.Destaque
+					gs.BackgroundTransparency=1; gs.BorderSizePixel=0
+					gs.ScrollingDirection=Enum.ScrollingDirection.Y
+					gs.ZIndex=2; gs.Parent=parent
+					container = gs
+				else
+					container = F({
+						Size=UDim2.new(0,gridW,0,math.min(gridH,maxH or gridH)),
+						BackgroundTransparency=1, ZIndex=2, Parent=parent})
+				end
+
+				for i, cor in ipairs(cores) do
+					local col=(i-1)%cols; local row=math.floor((i-1)/cols)
+					local btn=Instance.new("TextButton")
+					btn.Size=UDim2.new(0,cell,0,cell)
+					btn.Position=UDim2.new(0,col*(cell+gap),0,row*(cell+gap))
+					btn.BackgroundColor3=cor; btn.Text=""
+					btn.AutoButtonColor=false; btn.ZIndex=3; btn.Parent=container
+					Cantos(btn,5)
+					local brdCell=Stroke(btn,Color3.new(0,0,0),1,0.75)
+					btn.MouseEnter:Connect(function()
+						Tw(btn,0.1,{Size=UDim2.new(0,cell+3,0,cell+3),
+							Position=UDim2.new(0,col*(cell+gap)-1,0,row*(cell+gap)-1)}):Play()
+						Tw(brdCell,0.1,{Transparency=0.15}):Play()
+					end)
+					btn.MouseLeave:Connect(function()
+						Tw(btn,0.1,{Size=UDim2.new(0,cell,0,cell),
+							Position=UDim2.new(0,col*(cell+gap),0,row*(cell+gap))}):Play()
+						Tw(brdCell,0.1,{Transparency=0.75}):Play()
+					end)
+					btn.MouseButton1Click:Connect(function()
+						h,s,v = Color3.toHSV(cor)
+						AtualizarTudo()
+					end)
+				end
+				return container
+			end
+
+			-- ─── PC ───────────────────────────────────────────────────────
+			if not IS_MOBILE then
+				local CELL=22; local GAP=4; local COLS=6
+				local gridContainer = CriarGrid(corpo2, CELL, GAP, COLS, PICKER_H-16)
+				gridContainer.Position = UDim2.new(0,10,0,8)
+
+				local rightX = COLS*(CELL+GAP)-GAP + 22
+				local rightW = 115
+
+				local bp = F({Size=UDim2.new(0,rightW,0,40),
+					Position=UDim2.new(0,rightX,0,8),
+					BackgroundColor3=corAtual, ZIndex=2, Parent=corpo2})
+				Cantos(bp,8); Stroke(bp,C.Borda,1,0.25)
+				bigPreview_ref = bp
+
+				local lh = L({Size=UDim2.new(0,rightW,0,14),
+					Position=UDim2.new(0,rightX,0,52),
+					Text=CorParaHex(corAtual), TextColor3=C.Sub,
+					Font=Enum.Font.GothamBold, TextSize=10,
+					TextXAlignment=Enum.TextXAlignment.Center, ZIndex=2, Parent=corpo2})
+				RC(lh,"TextColor3","Sub"); lblHex_ref = lh
+
+				slH_ref = CriarSliderHSV("H", 70,  rightX, rightW, 13, 9, 28, "h")
+				slS_ref = CriarSliderHSV("S", 100, rightX, rightW, 13, 9, 28, "s")
+				slV_ref = CriarSliderHSV("V", 130, rightX, rightW, 13, 9, 28, "v")
+
+			-- ─── MOBILE ───────────────────────────────────────────────────
+			else
+				local CELL=26; local GAP=4; local COLS=9
+				local gridVisW = 180
+				local gs = Instance.new("ScrollingFrame")
+				gs.Size=UDim2.new(0,gridVisW,0,150); gs.Position=UDim2.new(0,125,0,10)
+				gs.ScrollBarThickness=3; gs.ScrollBarImageColor3=C.Destaque
+				gs.BackgroundTransparency=1; gs.BorderSizePixel=0
+				gs.ScrollingDirection=Enum.ScrollingDirection.XY
+				gs.ZIndex=2; gs.Parent=corpo2
+				local totalRows=math.ceil(#cores/COLS)
+				gs.CanvasSize=UDim2.new(0,COLS*(CELL+GAP)-GAP+4,0,totalRows*(CELL+GAP)-GAP+4)
+
+				for i, cor in ipairs(cores) do
+					local col=(i-1)%COLS; local row=math.floor((i-1)/COLS)
+					local btn=Instance.new("TextButton")
+					btn.Size=UDim2.new(0,CELL,0,CELL)
+					btn.Position=UDim2.new(0,col*(CELL+GAP),0,row*(CELL+GAP))
+					btn.BackgroundColor3=cor; btn.Text=""
+					btn.AutoButtonColor=false; btn.ZIndex=3; btn.Parent=gs
+					Cantos(btn,5)
+					local brdCell=Stroke(btn,Color3.new(0,0,0),1,0.75)
+					btn.MouseEnter:Connect(function()
+						Tw(btn,0.1,{Size=UDim2.new(0,CELL+4,0,CELL+4),
+							Position=UDim2.new(0,col*(CELL+GAP)-2,0,row*(CELL+GAP)-2)}):Play()
+						Tw(brdCell,0.1,{Transparency=0.2}):Play()
+					end)
+					btn.MouseLeave:Connect(function()
+						Tw(btn,0.1,{Size=UDim2.new(0,CELL,0,CELL),
+							Position=UDim2.new(0,col*(CELL+GAP),0,row*(CELL+GAP))}):Play()
+						Tw(brdCell,0.1,{Transparency=0.75}):Play()
+					end)
+					btn.MouseButton1Click:Connect(function()
+						h,s,v = Color3.toHSV(cor)
+						AtualizarTudo()
+					end)
+				end
+
+				local sliderW=105; local sliderX=10; local lblSize=10; local bolaM=16
+
+				local bp = F({Size=UDim2.new(0,sliderW,0,55),
+					Position=UDim2.new(0,sliderX,0,168),
+					BackgroundColor3=corAtual, ZIndex=2, Parent=corpo2})
+				Cantos(bp,8); Stroke(bp,C.Borda,1,0.3)
+				bigPreview_ref = bp
+
+				local lh = L({Size=UDim2.new(0,sliderW,0,16),
+					Position=UDim2.new(0,sliderX,0,150),
+					Text=CorParaHex(corAtual), TextColor3=C.Sub,
+					Font=Enum.Font.GothamBold, TextSize=lblSize,
+					TextXAlignment=Enum.TextXAlignment.Center, ZIndex=2, Parent=corpo2})
+				RC(lh,"TextColor3","Sub"); lblHex_ref = lh
+
+				slH_ref = CriarSliderHSV("H",  8,  sliderX, sliderW, bolaM, lblSize, 36, "h")
+				slS_ref = CriarSliderHSV("S", 46, sliderX, sliderW, bolaM, lblSize, 36, "s")
+				slV_ref = CriarSliderHSV("V", 84, sliderX, sliderW, bolaM, lblSize, 36, "v")
+			end
+
+			-- inicializa tudo com a cor padrão
+			AtualizarTudo()
+
+			-- toggle abrir/fechar
+			cab.MouseButton1Click:Connect(function()
+				aberto = not aberto
+				Tw(fr,0.2,{Size=UDim2.new(1,-6,0, aberto and AH or FH)}):Play()
+				Tw(seta,0.2,{Rotation= aberto and -90 or 90}):Play()
+			end)
+			fr.MouseEnter:Connect(function()
+				if not aberto then Tw(fr,0.12,{BackgroundColor3=C.ItemHover}):Play() end
+			end)
+			fr.MouseLeave:Connect(function()
+				Tw(fr,0.12,{BackgroundColor3=C.Cartao}):Play()
+			end)
+
+			local obj = {}
+			function obj:Definir(c)
+				corAtual=c; h,s,v=Color3.toHSV(c); AtualizarTudo()
+			end
 			function obj:Obter() return corAtual end
 			obj.Set=obj.Definir; obj.Get=obj.Obter
 			return obj
@@ -828,7 +978,6 @@ function Hub.novo(nome, tema, velocidade)
 
 		-- ╔══════════════════════════════════════════════════════════╗
 		-- ║  CriarDropdown — com :AtualizarOpcoes(novaLista)        ║
-		-- ║  Destrói e recria os itens da lista sem recriar o frame  ║
 		-- ╚══════════════════════════════════════════════════════════╝
 		function Aba:CriarDropdown(texto, opcoes, callback)
 			local aberto = false
@@ -857,22 +1006,17 @@ function Hub.novo(nome, tema, velocidade)
 				Text="›", TextColor3=C.Fraco, Font=Enum.Font.GothamBold, TextSize=16, Rotation=90, Parent=cab})
 			RC(seta,"TextColor3","Fraco")
 
-			-- container dos itens (recriado em AtualizarOpcoes)
 			local lista = F({BackgroundTransparency=1, Parent=fr})
 			Pad(lista,4,4,8,8)
 			local lyL = Instance.new("UIListLayout", lista); lyL.Padding=UDim.new(0,4)
 
-			-- função interna: constrói os botões de item
 			local function ConstruirItens(ops)
-				-- limpa itens antigos
 				for _, ch in ipairs(lista:GetChildren()) do
 					if ch:IsA("TextButton") then ch:Destroy() end
 				end
-
 				local AH = FH + (#ops * (IHd + 4)) + 12
 				lista.Size     = UDim2.new(1,0,0,AH-FH)
 				lista.Position = UDim2.new(0,0,0,FH)
-
 				for _, op in ipairs(ops) do
 					local it = Instance.new("TextButton")
 					it.Size=UDim2.new(1,0,0,IHd); it.BackgroundColor3=C.Item
@@ -883,14 +1027,11 @@ function Hub.novo(nome, tema, velocidade)
 					it.MouseLeave:Connect(function() Tw(it,0.12,{BackgroundColor3=C.Item,TextColor3=C.Texto}):Play() end)
 					it.MouseButton1Click:Connect(function()
 						sel=op; lblS.Text=sel; aberto=false
-						local AHf=FH+(#ops*(IHd+4))+12
 						Tw(fr,0.18,{Size=UDim2.new(1,-6,0,FH)}):Play()
 						Tw(seta,0.18,{Rotation=90}):Play()
 						if callback then callback(sel) end
 					end)
 				end
-
-				-- fecha se estava aberto com lista antiga
 				if aberto then
 					local AHn=FH+(#ops*(IHd+4))+12
 					fr.Size=UDim2.new(1,-6,0,AHn)
@@ -901,7 +1042,6 @@ function Hub.novo(nome, tema, velocidade)
 
 			cab.MouseButton1Click:Connect(function()
 				aberto = not aberto
-				local ops = lista:GetChildren()
 				local cnt = 0
 				for _, ch in ipairs(lista:GetChildren()) do if ch:IsA("TextButton") then cnt+=1 end end
 				local AH = FH + (cnt * (IHd + 4)) + 12
@@ -912,37 +1052,19 @@ function Hub.novo(nome, tema, velocidade)
 			fr.MouseLeave:Connect(function() Tw(fr,0.12,{BackgroundColor3=C.Cartao}):Play() end)
 
 			local obj = {}
-
-			function obj:Definir(v)
-				sel = v; lblS.Text = v
-			end
-
-			function obj:Obter()
-				return sel
-			end
-
-			-- ✅ NOVO: atualiza a lista de opções em tempo real
+			function obj:Definir(v) sel=v; lblS.Text=v end
+			function obj:Obter() return sel end
 			function obj:AtualizarOpcoes(novasOps)
-				-- se o item selecionado sumiu, seleciona o primeiro da nova lista
-				local aindaExiste = false
-				for _, n in ipairs(novasOps) do
-					if n == sel then aindaExiste = true; break end
-				end
-				if not aindaExiste then
-					sel = novasOps[1] or "-"
-					lblS.Text = sel
-				end
-				-- fecha antes de reconstruir
-				aberto = false
+				local aindaExiste=false
+				for _,n in ipairs(novasOps) do if n==sel then aindaExiste=true; break end end
+				if not aindaExiste then sel=novasOps[1] or "-"; lblS.Text=sel end
+				aberto=false
 				Tw(fr,0.1,{Size=UDim2.new(1,-6,0,FH)}):Play()
 				Tw(seta,0.1,{Rotation=90}):Play()
 				task.wait(0.12)
 				ConstruirItens(novasOps)
 			end
-
-			obj.Set            = obj.Definir
-			obj.Get            = obj.Obter
-			obj.UpdateOptions  = obj.AtualizarOpcoes
+			obj.Set=obj.Definir; obj.Get=obj.Obter; obj.UpdateOptions=obj.AtualizarOpcoes
 			return obj
 		end
 
@@ -952,7 +1074,7 @@ function Hub.novo(nome, tema, velocidade)
 			Cantos(fr,10); Stroke(fr,C.Borda,1,0.45); RC(fr,"BackgroundColor3","Cartao")
 			local lbl=L({Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,10,0,0),Text=textoInicial or "",TextColor3=corTexto,Font=Enum.Font.Gotham,TextSize=13,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true,Parent=fr})
 			lbl:GetPropertyChangedSignal("TextBounds"):Connect(function()
-				local h=math.max(36,math.ceil(lbl.TextBounds.Y/14)*16+12); fr.Size=UDim2.new(1,-6,0,h)
+				local h2=math.max(36,math.ceil(lbl.TextBounds.Y/14)*16+12); fr.Size=UDim2.new(1,-6,0,h2)
 			end)
 			local obj={}
 			function obj:Definir(v) lbl.Text=v or "" end
